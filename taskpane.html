@@ -10,7 +10,9 @@
   /* Fixed light appearance regardless of Word's theme -- avoids chasing
      an unreliable dark-mode signal from inside the taskpane iframe. */
   body { font-family: monospace; margin: 0.5rem; background: #fff; color: #000; }
-  textarea { width: 100%; height: 16rem; resize: vertical; }
+  textarea { width: 100%; height: 16rem; resize: none; } /* native corner grip is tiny -- using our own bar below instead */
+  #resizeHandle { height: 14px; background: #ddd; border: 1px solid #bbb; border-top: none;
+    cursor: ns-resize; text-align: center; font-size: 0.7rem; line-height: 14px; user-select: none; }
   #target { border: 1px solid #ccc; margin: 0.5rem 0; min-height: 4rem; }
   #status { color: red; white-space: pre-wrap; }
   details { margin: 0.5rem 0; }
@@ -22,12 +24,13 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v12</div>
+  <div style="color:#888;font-size:0.8em;">build v13</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
     { name: "req",  wave: "0.1..0.." }
   ]}</textarea>
+  <div id="resizeHandle">⋯ drag to resize ⋯</div>
 
   <div id="status"></div>
   <div id="target"></div>
@@ -55,10 +58,12 @@
       <tr><td>.</td><td>repeat the previous cycle</td></tr>
       <tr><td>|</td><td>gap in the timeline</td></tr>
     </table>
-    <p>Arrows between signals use a top-level <code>edge</code> array, e.g.
-    <code>edge: ["A~>B rising to falling"]</code>, where A/B are node names
-    placed inline in a wave string like <code>"P.....l"</code> with a dotted
-    node id after the char, e.g. <code>"P.A..l"</code>.</p>
+    <p>Arrows between signals need a separate <code>node</code> string per
+    signal, same length as <code>wave</code>, marking each arrow endpoint
+    with a letter (<code>.</code> elsewhere), then a top-level
+    <code>edge</code> array referencing those letters, e.g.
+    <code>node: "..a...."</code> / <code>edge: ["a~&gt;b"]</code>. See the
+    Edges template for a working example.</p>
   </details>
 
 <script>
@@ -145,10 +150,10 @@
     tplEdges: {
       signal: [
         { name: 'clk', wave: 'p......' },
-        { name: 'req', wave: '0.1A..0' },
-        { name: 'ack', wave: '0....B0' }
+        { name: 'req', wave: '0.1...0', node: '..a....' },
+        { name: 'ack', wave: '0....10', node: '.....b.' }
       ],
-      edge: ['A~>B rising to falling']
+      edge: ['a~>b']
     }
   };
 
@@ -193,6 +198,29 @@
       status.textContent = mode === 'replace' ? 'replaced' : 'inserted';
     }).catch((e) => { status.textContent = 'insert failed: ' + describeError(e); });
   }
+
+  // Custom drag bar for the editor -- the native textarea corner grip is
+  // too small to reliably grab.
+  (function setupResizeHandle() {
+    const handle = document.getElementById('resizeHandle');
+    let startY = 0;
+    let startHeight = 0;
+
+    function onMove(e) {
+      src.style.height = Math.max(80, startHeight + (e.clientY - startY)) + 'px';
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    handle.addEventListener('mousedown', (e) => {
+      startY = e.clientY;
+      startHeight = src.offsetHeight;
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      e.preventDefault();
+    });
+  })();
 
   Office.onReady(() => {
     render();
