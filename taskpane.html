@@ -64,16 +64,45 @@
     return btoa(unescape(encodeURIComponent(svgString)));
   }
 
+  // Word's insertInlinePictureFromBase64 rejects SVG (GeneralException).
+  // Rasterize to PNG via canvas first.
+  function svgToPngBase64() {
+    const svg = target.querySelector('svg');
+    if (!svg) return Promise.resolve(null);
+    const svgString = new XMLSerializer().serializeToString(svg);
+    const width = svg.width.baseVal.value || svg.getBoundingClientRect().width;
+    const height = svg.height.baseVal.value || svg.getBoundingClientRect().height;
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/png').split(',')[1]); // strip "data:image/png;base64,"
+      };
+      img.onerror = reject;
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+    });
+  }
+
   Office.onReady(() => {
     render();
 
-    document.getElementById('insertBtn').addEventListener('click', () => {
-      const base64 = svgToBase64();
+    document.getElementById('insertBtn').addEventListener('click', async () => {
+      let base64;
+      try {
+        base64 = await svgToPngBase64();
+      } catch (e) {
+        status.textContent = 'rasterize failed: ' + describeError(e);
+        return;
+      }
       if (!base64) { status.textContent = 'nothing rendered to insert'; return; }
       Word.run(async (context) => {
         const pic = context.document.body.insertInlinePictureFromBase64(
           base64, Word.InsertLocation.end);
-        pic.altTextDescription = src.value; // round-trip source lives here
+        pic.altTextDescription = src.value; // round-trip source lives here, not the image
         await context.sync();
         status.textContent = 'inserted';
       }).catch((e) => { status.textContent = 'insert failed: ' + describeError(e); });
