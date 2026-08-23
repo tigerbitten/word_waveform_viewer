@@ -17,7 +17,7 @@
     <Host Name="Document" />
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/taskpane.html?v=10" />
+    <SourceLocation DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/taskpane.html?v=11" />
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
 </OfficeApp>
