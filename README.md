@@ -38,8 +38,6 @@ the image's alt-text, so no companion files and no server needed.
 
 - PNG only, not SVG — Word's `insertInlinePictureFromBase64` rejects SVG.
   No resolution independence.
-- Tested on Word for the web only. Desktop Word untested (blocked by
-  university IT's add-in policy; real target is [redacted] Word, access
-  pending).
+- Tested on Word for the web only. Desktop Word untested so far.
 - Alt-text capacity tested up to 200,000 characters with no truncation —
   not expected to be a real constraint.

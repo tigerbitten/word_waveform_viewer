@@ -23,17 +23,19 @@
   #status.status-success { color: #0a7a2f; }
   details { margin: 0.5rem 0; }
   summary { cursor: pointer; }
-  .template-row { margin: 0.15rem 0; }
-  table.legend { border-collapse: collapse; }
+  table.legend { border-collapse: collapse; margin-top: 0.5rem; }
   table.legend td, table.legend th { border: 1px solid #888; padding: 0.15rem 0.4rem; text-align: left; }
-  button { margin: 0.25rem 0.25rem 0.25rem 0; }
+  button { margin: 0; }
   button:disabled { opacity: 0.5; cursor: default; }
-  #actions { border: 1px solid #ccc; border-radius: 4px; padding: 0.4rem; margin: 0.5rem 0; }
-  #actions .label { font-size: 0.75rem; color: #666; margin-bottom: 0.2rem; }
+  /* One consistent look for every button group: bordered box, small label,
+     buttons in a wrapping row with a fixed gap (not per-button margins). */
+  .btn-group { border: 1px solid #ccc; border-radius: 4px; padding: 0.4rem; margin: 0.5rem 0; }
+  .btn-group .label { font-size: 0.75rem; color: #666; margin-bottom: 0.3rem; }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v17</div>
+  <div style="color:#888;font-size:0.8em;">build v18</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -44,20 +46,27 @@
   <div id="status"></div>
   <div id="target"></div>
 
-  <div id="actions">
+  <div id="actions" class="btn-group">
     <div class="label">Diagram actions</div>
-    <button id="insertBtn">Insert new diagram</button>
-    <button id="replaceBtn">Replace selected diagram</button>
-    <button id="loadBtn">Load selected diagram</button>
-    <button id="clearBtn">New (blank)</button>
+    <div class="btn-row">
+      <button id="insertBtn">Insert new diagram</button>
+      <button id="replaceBtn">Replace selected diagram</button>
+      <button id="loadBtn">Load selected diagram</button>
+      <button id="clearBtn">New (blank)</button>
+    </div>
   </div>
 
   <details>
     <summary>Templates &amp; wave-char cheat sheet</summary>
-    <div class="template-row"><button id="tplClock">Clock</button></div>
-    <div class="template-row"><button id="tplBus">Data bus</button></div>
-    <div class="template-row"><button id="tplHandshake">Handshake (req/ack)</button></div>
-    <div class="template-row"><button id="tplEdges">Edges (arrows between signals)</button></div>
+    <div class="btn-group">
+      <div class="label">Templates</div>
+      <div class="btn-row">
+        <button id="tplClock">Clock</button>
+        <button id="tplBus">Data bus</button>
+        <button id="tplHandshake">Handshake (req/ack)</button>
+        <button id="tplEdges">Edges (arrows between signals)</button>
+      </div>
+    </div>
     <table class="legend">
       <tr><th>char</th><th>meaning</th></tr>
       <tr><td>p / n</td><td>positive / negative clock pulse</td></tr>
