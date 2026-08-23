@@ -44,7 +44,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v21</div>
+  <div style="color:#888;font-size:0.8em;">build v22</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -65,7 +65,6 @@
       <button id="addSignalBtn">Add signal</button>
       <button id="copyBtn">Copy JSON</button>
     </div>
-    <textarea id="copyOutput" readonly style="display:none; width:100%; height:6rem; margin-top:0.4rem;"></textarea>
   </div>
 
   <details>
@@ -366,20 +365,11 @@
 
     document.getElementById('copyBtn').addEventListener('click', () => {
       // navigator.clipboard.writeText is blocked by Word's iframe permissions
-      // policy -- select the text instead so the user can Ctrl+C it themselves.
-      let json;
-      try {
-        json = parseWaveJSON(src.value);
-      } catch (e) {
-        setStatus('fix the parse error before copying: ' + e.message, 'error');
-        return;
-      }
-      const out = document.getElementById('copyOutput');
-      out.style.display = 'block';
-      out.value = JSON.stringify(json, null, 2);
-      out.focus();
-      out.select();
-      setStatus('JSON selected below -- press Ctrl+C to copy', 'success');
+      // policy -- select the text in the editor itself so the user can
+      // Ctrl+C it themselves, rather than a separate copy widget.
+      src.focus();
+      src.select();
+      setStatus('JSON selected above -- press Ctrl+C to copy', 'success');
     });
   });
 
