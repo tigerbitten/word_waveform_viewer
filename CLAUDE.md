@@ -40,3 +40,12 @@ platform — code like it.
   in logging.
 
 When in doubt: fewer files, fewer layers, fewer knobs.
+
+## Word caches the taskpane aggressively
+
+Every time `taskpane.html` changes and gets pushed, bump the `?v=N` query
+param on `SourceLocation` in `manifest.xml` to the next number. Without a
+new URL, Word keeps serving a stale cached copy of the taskpane even after
+a fresh GitHub Pages deploy, and changes silently don't show up. This one
+line has repeatedly cost more debugging time than everything else in this
+project — always bump it, no exceptions.
