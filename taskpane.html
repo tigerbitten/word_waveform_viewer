@@ -18,14 +18,22 @@
   #resizeHandle { height: 14px; background: #ddd; border: 1px solid #bbb; border-top: none;
     cursor: ns-resize; text-align: center; font-size: 0.7rem; line-height: 14px; user-select: none; }
   #target { border: 1px solid #ccc; margin: 0.5rem 0; min-height: 4rem; }
-  #status { white-space: pre-wrap; min-height: 1.2em; }
-  #status.status-error { color: #b00020; }
-  #status.status-success { color: #0a7a2f; }
+  /* Reserves its height even when empty, so nothing jumps when a message
+     appears -- but stays visually blank (no border/background) until then. */
+  #status { white-space: pre-wrap; min-height: 1.2em; margin: 0.5rem 0; padding: 0.35rem 0.6rem;
+    border: 1px solid transparent; border-radius: 4px; background: transparent; }
+  #status.status-error { color: #b00020; background: #fdecec; border-color: #f3b8b8; }
+  #status.status-success { color: #0a7a2f; background: #eaf7ee; border-color: #b8e0c4; }
   details { margin: 0.5rem 0; }
   summary { cursor: pointer; }
   table.legend { border-collapse: collapse; margin-top: 0.5rem; }
   table.legend td, table.legend th { border: 1px solid #888; padding: 0.15rem 0.4rem; text-align: left; }
-  button { margin: 0; }
+  /* Secondary is the default look; .primary marks the two main actions
+     (Insert / Replace) so they read faster than Load/New/templates. */
+  button { margin: 0; border-radius: 4px; padding: 0.35rem 0.7rem; cursor: pointer;
+    background: #f3f3f3; color: #111; border: 1px solid #bbb; }
+  button.primary { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+  button.primary:hover:not(:disabled) { background: #1d4ed8; }
   button:disabled { opacity: 0.5; cursor: default; }
   /* One consistent look for every button group: bordered box, small label,
      buttons in a wrapping row with a fixed gap (not per-button margins). */
@@ -35,7 +43,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v18</div>
+  <div style="color:#888;font-size:0.8em;">build v19</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -49,8 +57,8 @@
   <div id="actions" class="btn-group">
     <div class="label">Diagram actions</div>
     <div class="btn-row">
-      <button id="insertBtn">Insert new diagram</button>
-      <button id="replaceBtn">Replace selected diagram</button>
+      <button id="insertBtn" class="primary">Insert new diagram</button>
+      <button id="replaceBtn" class="primary">Replace selected diagram</button>
       <button id="loadBtn">Load selected diagram</button>
       <button id="clearBtn">New (blank)</button>
     </div>
