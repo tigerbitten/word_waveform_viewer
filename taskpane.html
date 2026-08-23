@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>waveform taskpane</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/wavedrom@3/skins/default.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/wavedrom@3/wavedrom.min.js"></script>
+<style>
+  body { font-family: monospace; margin: 0.5rem; }
+  textarea { width: 100%; height: 8rem; }
+  #target { border: 1px solid #ccc; margin: 0.5rem 0; min-height: 4rem; }
+  #status { color: red; }
+  button { margin: 0.25rem 0.25rem 0.25rem 0; }
+</style>
+</head>
+<body>
+  <textarea id="src">{ signal: [
+    { name: "clk",  wave: "p......." },
+    { name: "data", wave: "x.345x..", data: ["a","b","c"] },
+    { name: "req",  wave: "0.1..0.." }
+  ]}</textarea>
+
+  <div id="status"></div>
+  <div id="target"></div>
+
+  <button id="insertBtn">Insert into Word</button>
+  <button id="loadBtn">Load selected diagram</button>
+
+<script>
+  const src = document.getElementById('src');
+  const target = document.getElementById('target');
+  const status = document.getElementById('status');
+
+  function parseWaveJSON(text) {
+    // WaveJSON is a JS-object literal, not strict JSON (unquoted keys).
+    return eval('(' + text + ')');
+  }
+
+  function render() {
+    let json;
+    try {
+      json = parseWaveJSON(src.value);
+      status.textContent = '';
+    } catch (e) {
+      status.textContent = 'parse error: ' + e.message;
+      return;
+    }
+    target.innerHTML =
+      '<script type="WaveDrom">' + JSON.stringify(json) + '<\/script>' +
+      '<div id="WaveDrom_Display_0"></div>';
+    WaveDrom.ProcessAll();
+  }
+
+  function svgToBase64() {
+    const svg = target.querySelector('svg');
+    if (!svg) return null;
+    const svgString = new XMLSerializer().serializeToString(svg);
+    return btoa(unescape(encodeURIComponent(svgString)));
+  }
+
+  Office.onReady(() => {
+    render();
+
+    document.getElementById('insertBtn').addEventListener('click', () => {
+      const base64 = svgToBase64();
+      if (!base64) { status.textContent = 'nothing rendered to insert'; return; }
+      Word.run(async (context) => {
+        const pic = context.document.body.insertInlinePictureFromBase64(
+          base64, Word.InsertLocation.end);
+        pic.altTextDescription = src.value; // round-trip source lives here
+        await context.sync();
+        status.textContent = 'inserted';
+      }).catch((e) => { status.textContent = 'insert failed: ' + e.message; });
+    });
+
+    document.getElementById('loadBtn').addEventListener('click', () => {
+      Word.run(async (context) => {
+        const sel = context.document.getSelection();
+        const pics = sel.inlinePictures;
+        pics.load('items');
+        await context.sync();
+        if (pics.items.length === 0) {
+          status.textContent = 'select a diagram image first';
+          return;
+        }
+        const pic = pics.items[0];
+        pic.load('altTextDescription');
+        await context.sync();
+        src.value = pic.altTextDescription;
+        render();
+        status.textContent = 'loaded from selection';
+      }).catch((e) => { status.textContent = 'load failed: ' + e.message; });
+    });
+  });
+
+  src.addEventListener('input', render);
+</script>
+</body>
+</html>
