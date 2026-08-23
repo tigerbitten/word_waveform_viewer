@@ -8,7 +8,7 @@
   <Version>1.0.0.0</Version>
   <ProviderName>prototype</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Waveform Viewer" />
+  <DisplayName DefaultValue="Waveform Viewer/Editor" />
   <Description DefaultValue="WaveJSON to SVG timing diagrams in Word (prototype)" />
   <IconUrl DefaultValue="https://github.githubassets.com/favicons/favicon.png" />
   <HighResolutionIconUrl DefaultValue="https://github.githubassets.com/favicons/favicon.png" />
@@ -17,7 +17,7 @@
     <Host Name="Document" />
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/taskpane.html?v=13" />
+    <SourceLocation DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/taskpane.html?v=14" />
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
 </OfficeApp>
