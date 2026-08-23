@@ -52,6 +52,11 @@
     WaveDrom.ProcessAll();
   }
 
+  function describeError(e) {
+    // OfficeExtension errors often have an empty .message but a real .code / debugInfo.
+    return (e && (e.code || e.message)) + ' | ' + JSON.stringify(e && e.debugInfo);
+  }
+
   function svgToBase64() {
     const svg = target.querySelector('svg');
     if (!svg) return null;
@@ -71,7 +76,7 @@
         pic.altTextDescription = src.value; // round-trip source lives here
         await context.sync();
         status.textContent = 'inserted';
-      }).catch((e) => { status.textContent = 'insert failed: ' + e.message; });
+      }).catch((e) => { status.textContent = 'insert failed: ' + describeError(e); });
     });
 
     document.getElementById('loadBtn').addEventListener('click', () => {
@@ -90,7 +95,7 @@
         src.value = pic.altTextDescription;
         render();
         status.textContent = 'loaded from selection';
-      }).catch((e) => { status.textContent = 'load failed: ' + e.message; });
+      }).catch((e) => { status.textContent = 'load failed: ' + describeError(e); });
     });
   });
 
