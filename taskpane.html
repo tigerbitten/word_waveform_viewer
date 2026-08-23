@@ -26,6 +26,7 @@
 
   <button id="insertBtn">Insert into Word</button>
   <button id="loadBtn">Load selected diagram</button>
+  <button id="testBtn">Insert test 1x1 PNG (isolation check)</button>
 
 <script>
   const src = document.getElementById('src');
@@ -89,6 +90,16 @@
 
   Office.onReady(() => {
     render();
+
+    document.getElementById('testBtn').addEventListener('click', () => {
+      // Known-good hardcoded 1x1 red PNG, bypasses WaveDrom/canvas entirely.
+      const tinyPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+      Word.run(async (context) => {
+        context.document.body.insertInlinePictureFromBase64(tinyPng, Word.InsertLocation.end);
+        await context.sync();
+        status.textContent = 'test image inserted';
+      }).catch((e) => { status.textContent = 'test insert failed: ' + describeError(e); });
+    });
 
     document.getElementById('insertBtn').addEventListener('click', async () => {
       let base64;
