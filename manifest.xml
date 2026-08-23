@@ -4,7 +4,7 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
     xsi:type="TaskPaneApp">
-  <Id>3875f959-c909-48da-b1cc-1c4e98fa330f</Id>
+  <Id>6ed19394-100a-430d-9051-cb1c322260ec</Id>
   <Version>1.0.0.0</Version>
   <ProviderName>prototype</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
@@ -17,7 +17,7 @@
     <Host Name="Document" />
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/taskpane.html?v=15" />
+    <SourceLocation DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/taskpane.html?v=16" />
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
 </OfficeApp>

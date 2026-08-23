@@ -9,8 +9,12 @@
 <style>
   /* Fixed light appearance regardless of Word's theme -- avoids chasing
      an unreliable dark-mode signal from inside the taskpane iframe. */
-  body { font-family: monospace; margin: 0.5rem; background: #fff; color: #000; }
-  textarea { width: 100%; height: 16rem; resize: none; } /* native corner grip is tiny -- using our own bar below instead */
+  body { font-family: monospace; margin: 0.5rem 0.5rem 0.5rem 1rem; background: #fff; color: #000; }
+  /* left padding on the textarea itself too -- keeps the text cursor away
+     from the pane's own left-edge drag zone, and native corner grip is
+     tiny so we use our own resize bar below instead. */
+  textarea { width: 100%; height: 16rem; resize: none; box-sizing: border-box;
+    padding: 0.4rem 0.4rem 0.4rem 0.6rem; line-height: 1.4; }
   #resizeHandle { height: 14px; background: #ddd; border: 1px solid #bbb; border-top: none;
     cursor: ns-resize; text-align: center; font-size: 0.7rem; line-height: 14px; user-select: none; }
   #target { border: 1px solid #ccc; margin: 0.5rem 0; min-height: 4rem; }
@@ -29,7 +33,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v15</div>
+  <div style="color:#888;font-size:0.8em;">build v16</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -313,6 +317,17 @@
   });
 
   src.addEventListener('input', render);
+
+  // Tab normally jumps focus out of a textarea -- insert an indent instead.
+  src.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    const start = src.selectionStart;
+    const end = src.selectionEnd;
+    src.value = src.value.slice(0, start) + '  ' + src.value.slice(end);
+    src.selectionStart = src.selectionEnd = start + 2;
+    render();
+  });
 </script>
 </body>
 </html>
