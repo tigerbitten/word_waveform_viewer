@@ -10,12 +10,17 @@
   body { font-family: monospace; margin: 0.5rem; }
   textarea { width: 100%; height: 8rem; }
   #target { border: 1px solid #ccc; margin: 0.5rem 0; min-height: 4rem; }
-  #status, #capacityResults { color: red; white-space: pre-wrap; }
+  #status { color: red; white-space: pre-wrap; }
+  details { margin: 0.5rem 0; }
+  summary { cursor: pointer; }
+  .template-row { margin: 0.15rem 0; }
+  table.legend { border-collapse: collapse; }
+  table.legend td, table.legend th { border: 1px solid #888; padding: 0.15rem 0.4rem; text-align: left; }
   button { margin: 0.25rem 0.25rem 0.25rem 0; }
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v9</div>
+  <div style="color:#888;font-size:0.8em;">build v10</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -28,8 +33,24 @@
   <button id="insertBtn">Insert new diagram</button>
   <button id="replaceBtn">Replace selected diagram</button>
   <button id="loadBtn">Load selected diagram</button>
-  <button id="capacityBtn">Test alt-text capacity</button>
-  <pre id="capacityResults"></pre>
+
+  <details>
+    <summary>Templates &amp; wave-char cheat sheet</summary>
+    <div class="template-row"><button id="tplClock">Clock</button></div>
+    <div class="template-row"><button id="tplBus">Data bus</button></div>
+    <div class="template-row"><button id="tplHandshake">Handshake (req/ack)</button></div>
+    <table class="legend">
+      <tr><th>char</th><th>meaning</th></tr>
+      <tr><td>p / n</td><td>positive / negative clock pulse</td></tr>
+      <tr><td>P / N</td><td>clock pulse, no leading edge</td></tr>
+      <tr><td>0 / 1</td><td>low / high</td></tr>
+      <tr><td>x</td><td>don't care</td></tr>
+      <tr><td>z</td><td>high impedance</td></tr>
+      <tr><td>2-9</td><td>bus value, labeled via the matching <code>data</code> array entry</td></tr>
+      <tr><td>.</td><td>repeat the previous cycle</td></tr>
+      <tr><td>|</td><td>gap in the timeline</td></tr>
+    </table>
+  </details>
 
 <script>
   const src = document.getElementById('src');
@@ -99,39 +120,20 @@
     });
   }
 
-  // Probe Word's actual altTextDescription length limit: write increasing
-  // sizes of alt-text to a throwaway image, read each straight back, and
-  // report the first size that gets truncated or rejected.
-  async function testAltTextCapacity() {
-    const results = document.getElementById('capacityResults');
-    results.textContent = 'running...\n';
-    const sizes = [1000, 5000, 10000, 25000, 50000, 100000, 200000];
-    const tinyPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
-
-    for (const size of sizes) {
-      const payload = ALT_TEXT_SENTINEL + 'x'.repeat(size);
-      try {
-        await Word.run(async (context) => {
-          const pic = context.document.body.insertInlinePictureFromBase64(tinyPng, Word.InsertLocation.end);
-          pic.altTextDescription = payload;
-          await context.sync();
-          pic.load('altTextDescription');
-          await context.sync();
-          const got = pic.altTextDescription || '';
-          const ok = got === payload;
-          results.textContent += size + ' chars: ' + (ok ? 'OK' : 'MISMATCH, got ' + got.length + ' chars back') + '\n';
-          if (!ok) throw new Error('stop');
-        });
-      } catch (e) {
-        if (e.message !== 'stop') {
-          results.textContent += size + ' chars: FAILED -- ' + describeError(e) + '\n';
-        }
-        results.textContent += 'stopping at first failure.\n';
-        return;
-      }
-    }
-    results.textContent += 'all sizes up to ' + sizes[sizes.length - 1] + ' chars OK.\n';
-  }
+  const TEMPLATES = {
+    tplClock: { signal: [
+      { name: 'clk', wave: 'p.......' }
+    ]},
+    tplBus: { signal: [
+      { name: 'clk',  wave: 'p.......' },
+      { name: 'data', wave: 'x.345x..', data: ['a', 'b', 'c'] }
+    ]},
+    tplHandshake: { signal: [
+      { name: 'clk', wave: 'p.......' },
+      { name: 'req', wave: '0.1..0..' },
+      { name: 'ack', wave: '0...1.0.' }
+    ]}
+  };
 
   // Shared by both Insert and Replace: rasterize the current editor
   // content, then place it either at the end of the doc or over the
@@ -180,7 +182,13 @@
 
     document.getElementById('insertBtn').addEventListener('click', () => insertOrReplace('insert'));
     document.getElementById('replaceBtn').addEventListener('click', () => insertOrReplace('replace'));
-    document.getElementById('capacityBtn').addEventListener('click', testAltTextCapacity);
+
+    for (const id of Object.keys(TEMPLATES)) {
+      document.getElementById(id).addEventListener('click', () => {
+        src.value = JSON.stringify(TEMPLATES[id], null, 2);
+        render();
+      });
+    }
 
     document.getElementById('loadBtn').addEventListener('click', () => {
       Word.run(async (context) => {
