@@ -24,6 +24,7 @@
     border: 1px solid transparent; border-radius: 4px; background: transparent; }
   #status.status-error { color: #b00020; background: #fdecec; border-color: #f3b8b8; }
   #status.status-success { color: #0a7a2f; background: #eaf7ee; border-color: #b8e0c4; }
+  #status.status-warning { color: #8a6100; background: #fff6e0; border-color: #f0dca0; }
   details { margin: 0.5rem 0; }
   summary { cursor: pointer; }
   table.legend { border-collapse: collapse; margin-top: 0.5rem; }
@@ -43,7 +44,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v19</div>
+  <div style="color:#888;font-size:0.8em;">build v20</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -61,7 +62,10 @@
       <button id="replaceBtn" class="primary">Replace selected diagram</button>
       <button id="loadBtn">Load selected diagram</button>
       <button id="clearBtn">New (blank)</button>
+      <button id="addSignalBtn">Add signal</button>
+      <button id="copyBtn">Copy JSON</button>
     </div>
+    <div class="label" style="margin-top: 0.3rem; margin-bottom: 0;">Ctrl+Enter in the editor = Insert new diagram</div>
   </div>
 
   <details>
@@ -105,7 +109,20 @@
 
   function setStatus(text, kind) {
     status.textContent = text;
-    status.className = kind === 'success' ? 'status-success' : kind === 'error' ? 'status-error' : '';
+    status.className = kind ? 'status-' + kind : '';
+  }
+
+  // Common WaveJSON mistake: signals with different wave-string lengths
+  // render misaligned. Not fatal, so this warns rather than blocking.
+  function checkWaveLengths(json) {
+    if (!json || !Array.isArray(json.signal)) return null;
+    const lengths = json.signal
+      .filter((s) => s && typeof s.wave === 'string')
+      .map((s) => ({ name: s.name || '(unnamed)', len: s.wave.length }));
+    if (lengths.length < 2) return null;
+    const first = lengths[0].len;
+    if (lengths.every((l) => l.len === first)) return null;
+    return 'wave length mismatch: ' + lengths.map((l) => l.name + '=' + l.len).join(', ');
   }
 
   // Disables the main action buttons while an async Word.run is in flight,
@@ -135,7 +152,8 @@
     let json;
     try {
       json = parseWaveJSON(src.value);
-      setStatus('', '');
+      const warning = checkWaveLengths(json);
+      setStatus(warning || '', warning ? 'warning' : '');
     } catch (e) {
       setStatus('parse error: ' + e.message, 'error');
       return;
@@ -327,24 +345,62 @@
     });
 
     document.getElementById('clearBtn').addEventListener('click', () => {
-      src.value = '{ signal: [] }';
+      src.value = JSON.stringify({ signal: [{ name: '', wave: '' }] }, null, 2);
       render();
       setStatus('cleared', 'success');
+    });
+
+    document.getElementById('addSignalBtn').addEventListener('click', () => {
+      let json;
+      try {
+        json = parseWaveJSON(src.value);
+      } catch (e) {
+        setStatus('fix the parse error before adding a signal: ' + e.message, 'error');
+        return;
+      }
+      if (!Array.isArray(json.signal)) json.signal = [];
+      json.signal.push({ name: '', wave: '' });
+      src.value = JSON.stringify(json, null, 2);
+      render();
+    });
+
+    document.getElementById('copyBtn').addEventListener('click', async () => {
+      let json;
+      try {
+        json = parseWaveJSON(src.value);
+      } catch (e) {
+        setStatus('fix the parse error before copying: ' + e.message, 'error');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(json, null, 2));
+        setStatus('copied to clipboard', 'success');
+      } catch (e) {
+        setStatus('copy failed: ' + (e.message || e), 'error');
+      }
     });
   });
 
   src.addEventListener('input', render);
 
-  // Tab normally jumps focus out of a textarea -- insert an indent instead.
   src.addEventListener('keydown', (e) => {
-    if (e.key !== 'Tab') return;
-    e.preventDefault();
-    e.stopPropagation();
-    const start = src.selectionStart;
-    const end = src.selectionEnd;
-    src.value = src.value.slice(0, start) + '  ' + src.value.slice(end);
-    src.selectionStart = src.selectionEnd = start + 2;
-    render();
+    // Tab normally jumps focus out of a textarea -- insert an indent instead.
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      e.stopPropagation();
+      const start = src.selectionStart;
+      const end = src.selectionEnd;
+      src.value = src.value.slice(0, start) + '  ' + src.value.slice(end);
+      src.selectionStart = src.selectionEnd = start + 2;
+      render();
+      return;
+    }
+    // Ctrl/Cmd+Enter = Insert new diagram, without reaching for the mouse.
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      insertOrReplace('insert');
+    }
   });
 </script>
 </body>
