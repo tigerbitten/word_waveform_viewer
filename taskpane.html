@@ -33,7 +33,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v16</div>
+  <div style="color:#888;font-size:0.8em;">build v17</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -322,6 +322,7 @@
   src.addEventListener('keydown', (e) => {
     if (e.key !== 'Tab') return;
     e.preventDefault();
+    e.stopPropagation();
     const start = src.selectionStart;
     const end = src.selectionEnd;
     src.value = src.value.slice(0, start) + '  ' + src.value.slice(end);
