@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>waveform prototype</title>
+<script src="https://cdn.jsdelivr.net/npm/wavedrom@3/skins/default.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/wavedrom@3/wavedrom.min.js"></script>
+<style>
+  body { display: flex; gap: 1rem; font-family: monospace; margin: 1rem; }
+  textarea { width: 40%; height: 90vh; }
+  #out { width: 60%; overflow: auto; }
+  #status { color: red; }
+</style>
+</head>
+<body>
+  <textarea id="src">{ signal: [
+    { name: "clk",  wave: "p......." },
+    { name: "data", wave: "x.345x..", data: ["a","b","c"] },
+    { name: "req",  wave: "0.1..0.." }
+  ]}</textarea>
+
+  <div id="out">
+    <div id="status"></div>
+    <div id="target"></div>
+    <button id="dump">Get SVG string</button>
+    <textarea id="svgout" style="width:100%; height:30vh;" readonly></textarea>
+  </div>
+
+<script>
+  const src = document.getElementById('src');
+  const target = document.getElementById('target');
+  const status = document.getElementById('status');
+
+  function render() {
+    let json;
+    try {
+      // eslint-disable-next-line no-eval
+      json = eval('(' + src.value + ')'); // WaveJSON is JS-object literal, not strict JSON
+      status.textContent = '';
+    } catch (e) {
+      status.textContent = 'parse error: ' + e.message;
+      return;
+    }
+    // WaveDrom.ProcessAll() scans the DOM for <script type="WaveDrom"> tags
+    // and renders each into the matching WaveDrom_Display_<n> div.
+    target.innerHTML =
+      '<script type="WaveDrom">' + JSON.stringify(json) + '<\/script>' +
+      '<div id="WaveDrom_Display_0"></div>';
+    WaveDrom.ProcessAll();
+  }
+
+  document.getElementById('dump').addEventListener('click', () => {
+    const svg = target.querySelector('svg');
+    if (!svg) { status.textContent = 'no svg rendered yet'; return; }
+    document.getElementById('svgout').value = new XMLSerializer().serializeToString(svg);
+  });
+
+  src.addEventListener('input', render);
+  window.addEventListener('load', render);
+</script>
+</body>
+</html>
