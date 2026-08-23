@@ -15,7 +15,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v5</div>
+  <div style="color:#888;font-size:0.8em;">build v6</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -34,9 +34,17 @@
   const target = document.getElementById('target');
   const status = document.getElementById('status');
 
+  const ALT_TEXT_SENTINEL = 'WAVEJSON:v1:';
+
   function parseWaveJSON(text) {
-    // WaveJSON is a JS-object literal, not strict JSON (unquoted keys).
-    return eval('(' + text + ')');
+    // WaveJSON is written as a JS-object literal (unquoted keys, single
+    // quotes allowed), not strict JSON. Quote it into real JSON rather than
+    // eval-ing it, so a corrupted or hand-edited alt-text field can never
+    // execute code -- worst case it just fails to parse.
+    const asJSON = text
+      .replace(/'([^']*)'/g, '"$1"')
+      .replace(/([{,]\s*)([A-Za-z_$][A-Za-z0-9_$]*)\s*:/g, '$1"$2":');
+    return JSON.parse(asJSON);
   }
 
   function render() {
@@ -111,6 +119,13 @@
         return;
       }
       if (!base64) { status.textContent = 'nothing rendered to insert'; return; }
+      let json;
+      try {
+        json = parseWaveJSON(src.value);
+      } catch (e) {
+        status.textContent = 'parse error, not inserting: ' + e.message;
+        return;
+      }
       Word.run(async (context) => {
         const sel = context.document.getSelection();
         const selectedPics = sel.inlinePictures;
@@ -123,7 +138,9 @@
         const pic = replacing
           ? sel.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace)
           : context.document.body.insertInlinePictureFromBase64(base64, Word.InsertLocation.end);
-        pic.altTextDescription = src.value; // round-trip source lives here, not the image
+        // Canonical JSON, not the raw editor text -- keeps the round-trip
+        // format fixed regardless of what shorthand the user typed.
+        pic.altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
         await context.sync();
         status.textContent = (replacing ? 'replaced' : 'inserted') + ' (selected pics found: ' + foundCount + ')';
       }).catch((e) => { status.textContent = 'insert failed: ' + describeError(e); });
@@ -142,7 +159,20 @@
         const pic = pics.items[0];
         pic.load('altTextDescription');
         await context.sync();
-        src.value = pic.altTextDescription;
+
+        const raw = pic.altTextDescription || '';
+        if (!raw.startsWith(ALT_TEXT_SENTINEL)) {
+          status.textContent = 'selected image has no recognizable waveform source (alt-text missing or not from this tool)';
+          return;
+        }
+        let json;
+        try {
+          json = JSON.parse(raw.slice(ALT_TEXT_SENTINEL.length));
+        } catch (e) {
+          status.textContent = 'diagram source is corrupted, refusing to load: ' + e.message;
+          return;
+        }
+        src.value = JSON.stringify(json, null, 2);
         render();
         status.textContent = 'loaded from selection';
       }).catch((e) => { status.textContent = 'load failed: ' + describeError(e); });
