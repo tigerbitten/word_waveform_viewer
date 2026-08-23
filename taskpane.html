@@ -44,7 +44,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v22</div>
+  <div style="color:#888;font-size:0.8em;">build v23</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -244,8 +244,8 @@
       try {
         await Word.run(async (context) => {
           let pic;
+          const sel = context.document.getSelection();
           if (mode === 'replace') {
-            const sel = context.document.getSelection();
             const selectedPics = sel.inlinePictures;
             selectedPics.load('items');
             await context.sync();
@@ -253,10 +253,11 @@
               setStatus('nothing selected to replace -- select a diagram first', 'error');
               return;
             }
-            pic = sel.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
-          } else {
-            pic = context.document.body.insertInlinePictureFromBase64(base64, Word.InsertLocation.end);
           }
+          // 'Replace' on a Range swaps out whatever's currently selected --
+          // for a plain cursor (nothing selected) that just means "insert
+          // here," which is what we want for both modes.
+          pic = sel.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
           // Canonical JSON, not the raw editor text -- keeps the round-trip
           // format fixed regardless of what shorthand the user typed.
           pic.altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
