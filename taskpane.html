@@ -14,17 +14,22 @@
   #resizeHandle { height: 14px; background: #ddd; border: 1px solid #bbb; border-top: none;
     cursor: ns-resize; text-align: center; font-size: 0.7rem; line-height: 14px; user-select: none; }
   #target { border: 1px solid #ccc; margin: 0.5rem 0; min-height: 4rem; }
-  #status { color: red; white-space: pre-wrap; }
+  #status { white-space: pre-wrap; min-height: 1.2em; }
+  #status.status-error { color: #b00020; }
+  #status.status-success { color: #0a7a2f; }
   details { margin: 0.5rem 0; }
   summary { cursor: pointer; }
   .template-row { margin: 0.15rem 0; }
   table.legend { border-collapse: collapse; }
   table.legend td, table.legend th { border: 1px solid #888; padding: 0.15rem 0.4rem; text-align: left; }
   button { margin: 0.25rem 0.25rem 0.25rem 0; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #actions { border: 1px solid #ccc; border-radius: 4px; padding: 0.4rem; margin: 0.5rem 0; }
+  #actions .label { font-size: 0.75rem; color: #666; margin-bottom: 0.2rem; }
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v14</div>
+  <div style="color:#888;font-size:0.8em;">build v15</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -35,9 +40,13 @@
   <div id="status"></div>
   <div id="target"></div>
 
-  <button id="insertBtn">Insert new diagram</button>
-  <button id="replaceBtn">Replace selected diagram</button>
-  <button id="loadBtn">Load selected diagram</button>
+  <div id="actions">
+    <div class="label">Diagram actions</div>
+    <button id="insertBtn">Insert new diagram</button>
+    <button id="replaceBtn">Replace selected diagram</button>
+    <button id="loadBtn">Load selected diagram</button>
+    <button id="clearBtn">New (blank)</button>
+  </div>
 
   <details>
     <summary>Templates &amp; wave-char cheat sheet</summary>
@@ -73,6 +82,23 @@
 
   const ALT_TEXT_SENTINEL = 'WAVEJSON:v1:';
 
+  function setStatus(text, kind) {
+    status.textContent = text;
+    status.className = kind === 'success' ? 'status-success' : kind === 'error' ? 'status-error' : '';
+  }
+
+  // Disables the main action buttons while an async Word.run is in flight,
+  // so a double-click can't fire two inserts.
+  async function withButtonsDisabled(fn) {
+    const buttons = document.querySelectorAll('#actions button');
+    buttons.forEach((b) => { b.disabled = true; });
+    try {
+      await fn();
+    } finally {
+      buttons.forEach((b) => { b.disabled = false; });
+    }
+  }
+
   function parseWaveJSON(text) {
     // WaveJSON is written as a JS-object literal (unquoted keys, single
     // quotes allowed), not strict JSON. Quote it into real JSON rather than
@@ -88,9 +114,9 @@
     let json;
     try {
       json = parseWaveJSON(src.value);
-      status.textContent = '';
+      setStatus('', '');
     } catch (e) {
-      status.textContent = 'parse error: ' + e.message;
+      setStatus('parse error: ' + e.message, 'error');
       return;
     }
     target.innerHTML =
@@ -161,42 +187,48 @@
   // content, then place it either at the end of the doc or over the
   // current selection.
   async function insertOrReplace(mode) {
-    let base64;
-    try {
-      base64 = await svgToPngBase64();
-    } catch (e) {
-      status.textContent = 'rasterize failed: ' + describeError(e);
-      return;
-    }
-    if (!base64) { status.textContent = 'nothing rendered to insert'; return; }
-    let json;
-    try {
-      json = parseWaveJSON(src.value);
-    } catch (e) {
-      status.textContent = 'parse error, not inserting: ' + e.message;
-      return;
-    }
-    Word.run(async (context) => {
-      let pic;
-      if (mode === 'replace') {
-        const sel = context.document.getSelection();
-        const selectedPics = sel.inlinePictures;
-        selectedPics.load('items');
-        await context.sync();
-        if (selectedPics.items.length === 0) {
-          status.textContent = 'nothing selected to replace -- select a diagram first';
-          return;
-        }
-        pic = sel.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
-      } else {
-        pic = context.document.body.insertInlinePictureFromBase64(base64, Word.InsertLocation.end);
+    await withButtonsDisabled(async () => {
+      let base64;
+      try {
+        base64 = await svgToPngBase64();
+      } catch (e) {
+        setStatus('rasterize failed: ' + describeError(e), 'error');
+        return;
       }
-      // Canonical JSON, not the raw editor text -- keeps the round-trip
-      // format fixed regardless of what shorthand the user typed.
-      pic.altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
-      await context.sync();
-      status.textContent = mode === 'replace' ? 'replaced' : 'inserted';
-    }).catch((e) => { status.textContent = 'insert failed: ' + describeError(e); });
+      if (!base64) { setStatus('nothing rendered to insert', 'error'); return; }
+      let json;
+      try {
+        json = parseWaveJSON(src.value);
+      } catch (e) {
+        setStatus('parse error, not inserting: ' + e.message, 'error');
+        return;
+      }
+      try {
+        await Word.run(async (context) => {
+          let pic;
+          if (mode === 'replace') {
+            const sel = context.document.getSelection();
+            const selectedPics = sel.inlinePictures;
+            selectedPics.load('items');
+            await context.sync();
+            if (selectedPics.items.length === 0) {
+              setStatus('nothing selected to replace -- select a diagram first', 'error');
+              return;
+            }
+            pic = sel.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+          } else {
+            pic = context.document.body.insertInlinePictureFromBase64(base64, Word.InsertLocation.end);
+          }
+          // Canonical JSON, not the raw editor text -- keeps the round-trip
+          // format fixed regardless of what shorthand the user typed.
+          pic.altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
+          await context.sync();
+          setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
+        });
+      } catch (e) {
+        setStatus('insert failed: ' + describeError(e), 'error');
+      }
+    });
   }
 
   // Custom drag bar for the editor -- the native textarea corner grip is
@@ -236,35 +268,47 @@
     }
 
     document.getElementById('loadBtn').addEventListener('click', () => {
-      Word.run(async (context) => {
-        const sel = context.document.getSelection();
-        const pics = sel.inlinePictures;
-        pics.load('items');
-        await context.sync();
-        if (pics.items.length === 0) {
-          status.textContent = 'select a diagram image first';
-          return;
-        }
-        const pic = pics.items[0];
-        pic.load('altTextDescription');
-        await context.sync();
-
-        const raw = pic.altTextDescription || '';
-        if (!raw.startsWith(ALT_TEXT_SENTINEL)) {
-          status.textContent = 'selected image has no recognizable waveform source (alt-text missing or not from this tool)';
-          return;
-        }
-        let json;
+      withButtonsDisabled(async () => {
         try {
-          json = JSON.parse(raw.slice(ALT_TEXT_SENTINEL.length));
+          await Word.run(async (context) => {
+            const sel = context.document.getSelection();
+            const pics = sel.inlinePictures;
+            pics.load('items');
+            await context.sync();
+            if (pics.items.length === 0) {
+              setStatus('select a diagram image first', 'error');
+              return;
+            }
+            const pic = pics.items[0];
+            pic.load('altTextDescription');
+            await context.sync();
+
+            const raw = pic.altTextDescription || '';
+            if (!raw.startsWith(ALT_TEXT_SENTINEL)) {
+              setStatus('selected image has no recognizable waveform source (alt-text missing or not from this tool)', 'error');
+              return;
+            }
+            let json;
+            try {
+              json = JSON.parse(raw.slice(ALT_TEXT_SENTINEL.length));
+            } catch (e) {
+              setStatus('diagram source is corrupted, refusing to load: ' + e.message, 'error');
+              return;
+            }
+            src.value = JSON.stringify(json, null, 2);
+            render();
+            setStatus('loaded from selection', 'success');
+          });
         } catch (e) {
-          status.textContent = 'diagram source is corrupted, refusing to load: ' + e.message;
-          return;
+          setStatus('load failed: ' + describeError(e), 'error');
         }
-        src.value = JSON.stringify(json, null, 2);
-        render();
-        status.textContent = 'loaded from selection';
-      }).catch((e) => { status.textContent = 'load failed: ' + describeError(e); });
+      });
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      src.value = '{ signal: [] }';
+      render();
+      setStatus('cleared', 'success');
     });
   });
 
