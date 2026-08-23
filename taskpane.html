@@ -15,6 +15,7 @@
 </style>
 </head>
 <body>
+  <div style="color:#888;font-size:0.8em;">build v5</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -117,13 +118,14 @@
         await context.sync();
 
         // A diagram is selected -> replace it in place. Otherwise -> insert new at the end.
-        const replacing = selectedPics.items.length > 0;
+        const foundCount = selectedPics.items.length;
+        const replacing = foundCount > 0;
         const pic = replacing
           ? sel.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace)
           : context.document.body.insertInlinePictureFromBase64(base64, Word.InsertLocation.end);
         pic.altTextDescription = src.value; // round-trip source lives here, not the image
         await context.sync();
-        status.textContent = replacing ? 'replaced' : 'inserted';
+        status.textContent = (replacing ? 'replaced' : 'inserted') + ' (selected pics found: ' + foundCount + ')';
       }).catch((e) => { status.textContent = 'insert failed: ' + describeError(e); });
     });
 
