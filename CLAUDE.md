@@ -49,3 +49,13 @@ new URL, Word keeps serving a stale cached copy of the taskpane even after
 a fresh GitHub Pages deploy, and changes silently don't show up. This one
 line has repeatedly cost more debugging time than everything else in this
 project — always bump it, no exceptions.
+
+The taskpane also shows a `build vN` marker at the top of the page (bump it
+alongside `?v=N`) so a stale load is visually obvious instead of silently
+misleading.
+
+If bumping `?v=N` still doesn't work and the build marker won't update no
+matter what, that's a deeper cache (browser HTTP cache or a Word-session
+cache tied to your profile), not a stale URL. Fastest fix: sideload in a
+fresh private/incognito browser window instead of debugging the cache
+layers.
