@@ -15,7 +15,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v7</div>
+  <div style="color:#888;font-size:0.8em;">build v8</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -28,6 +28,8 @@
   <button id="insertBtn">Insert new diagram</button>
   <button id="replaceBtn">Replace selected diagram</button>
   <button id="loadBtn">Load selected diagram</button>
+  <button id="capacityBtn">Test alt-text capacity</button>
+  <pre id="capacityResults"></pre>
 
 <script>
   const src = document.getElementById('src');
@@ -97,6 +99,40 @@
     });
   }
 
+  // Probe Word's actual altTextDescription length limit: write increasing
+  // sizes of alt-text to a throwaway image, read each straight back, and
+  // report the first size that gets truncated or rejected.
+  async function testAltTextCapacity() {
+    const results = document.getElementById('capacityResults');
+    results.textContent = 'running...\n';
+    const sizes = [1000, 5000, 10000, 25000, 50000, 100000, 200000];
+    const tinyPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+    for (const size of sizes) {
+      const payload = ALT_TEXT_SENTINEL + 'x'.repeat(size);
+      try {
+        await Word.run(async (context) => {
+          const pic = context.document.body.insertInlinePictureFromBase64(tinyPng, Word.InsertLocation.end);
+          pic.altTextDescription = payload;
+          await context.sync();
+          pic.load('altTextDescription');
+          await context.sync();
+          const got = pic.altTextDescription || '';
+          const ok = got === payload;
+          results.textContent += size + ' chars: ' + (ok ? 'OK' : 'MISMATCH, got ' + got.length + ' chars back') + '\n';
+          if (!ok) throw new Error('stop');
+        });
+      } catch (e) {
+        if (e.message !== 'stop') {
+          results.textContent += size + ' chars: FAILED -- ' + describeError(e) + '\n';
+        }
+        results.textContent += 'stopping at first failure.\n';
+        return;
+      }
+    }
+    results.textContent += 'all sizes up to ' + sizes[sizes.length - 1] + ' chars OK.\n';
+  }
+
   // Shared by both Insert and Replace: rasterize the current editor
   // content, then place it either at the end of the doc or over the
   // current selection.
@@ -144,6 +180,7 @@
 
     document.getElementById('insertBtn').addEventListener('click', () => insertOrReplace('insert'));
     document.getElementById('replaceBtn').addEventListener('click', () => insertOrReplace('replace'));
+    document.getElementById('capacityBtn').addEventListener('click', testAltTextCapacity);
 
     document.getElementById('loadBtn').addEventListener('click', () => {
       Word.run(async (context) => {
