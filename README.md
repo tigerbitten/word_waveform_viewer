@@ -41,3 +41,8 @@ the image's alt-text, so no companion files and no server needed.
 - Tested on Word for the web only. Desktop Word untested so far.
 - Alt-text capacity tested up to 200,000 characters with no truncation —
   not expected to be a real constraint.
+- **No offline mode.** Needs internet on every load: the taskpane itself
+  (GitHub Pages), `office.js` (Microsoft's CDN), and WaveDrom + skin
+  (jsDelivr) are all fetched live, nothing bundled or cached. Would fail
+  entirely on an intranet-only machine. Possible future work: bundle
+  WaveDrom locally and host the taskpane internally.
