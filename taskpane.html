@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <title>Waveform Viewer/Editor</title>
 <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/wavedrom@3/skins/default.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/wavedrom@3/wavedrom.min.js"></script>
+<script src="vendor/default.js"></script>
+<script src="vendor/wavedrom.min.js"></script>
 <style>
   /* Fixed light appearance regardless of Word's theme -- avoids chasing
      an unreliable dark-mode signal from inside the taskpane iframe. */
@@ -44,7 +44,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v23</div>
+  <div style="color:#888;font-size:0.8em;">build v24</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },

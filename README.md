@@ -11,6 +11,9 @@ the image's alt-text, so no companion files and no server needed.
 - `manifest.xml` — points Word at the hosted taskpane, sideload this file.
 - `prototype.html` — standalone WaveJSON-to-SVG renderer, no Word/Office.js.
   Useful for iterating on rendering without touching Word at all.
+- `vendor/wavedrom.min.js`, `vendor/default.js` — WaveDrom itself, vendored
+  into the repo instead of pulled from jsDelivr. `office.js` is still loaded
+  from Microsoft's CDN (required — can't be self-hosted).
 
 ## How it works
 
@@ -42,7 +45,8 @@ the image's alt-text, so no companion files and no server needed.
 - Alt-text capacity tested up to 200,000 characters with no truncation —
   not expected to be a real constraint.
 - **No offline mode.** Needs internet on every load: the taskpane itself
-  (GitHub Pages), `office.js` (Microsoft's CDN), and WaveDrom + skin
-  (jsDelivr) are all fetched live, nothing bundled or cached. Would fail
-  entirely on an intranet-only machine. Possible future work: bundle
-  WaveDrom locally and host the taskpane internally.
+  (GitHub Pages) and `office.js` (Microsoft's CDN, required to be loaded
+  live) are fetched live. WaveDrom itself is now vendored locally (see
+  `vendor/`), so it no longer depends on jsDelivr being reachable. Would
+  still fail entirely on a machine with no reach to GitHub Pages / the
+  Microsoft CDN. Possible future work: host the taskpane internally too.
