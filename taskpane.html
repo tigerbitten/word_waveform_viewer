@@ -44,7 +44,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v24</div>
+  <div style="color:#888;font-size:0.8em;">build v25</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -257,7 +257,22 @@
           // 'Replace' on a Range swaps out whatever's currently selected --
           // for a plain cursor (nothing selected) that just means "insert
           // here," which is what we want for both modes.
-          pic = sel.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+          try {
+            pic = sel.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+            await context.sync();
+          } catch (e) {
+            // Word Online bug: inserting straight into a selection with no
+            // underlying run yet (e.g. an empty paragraph in a blank doc)
+            // throws "Cannot read properties of null (reading 'runIndex')".
+            // Forcing a run to exist first with a zero-width space works
+            // around it; the space is invisible and left in place.
+            if (!String(e.message).includes('runIndex')) throw e;
+            sel.insertText('​', Word.InsertLocation.replace);
+            await context.sync();
+            const sel2 = context.document.getSelection();
+            pic = sel2.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+            await context.sync();
+          }
           // Canonical JSON, not the raw editor text -- keeps the round-trip
           // format fixed regardless of what shorthand the user typed.
           pic.altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
