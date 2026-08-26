@@ -44,7 +44,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v25</div>
+  <div style="color:#888;font-size:0.8em;">build v26</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -241,44 +241,58 @@
         setStatus('parse error, not inserting: ' + e.message, 'error');
         return;
       }
-      try {
+      let noSelection = false;
+
+      // One insert attempt, in its own fresh Word.run/context. 'workaround'
+      // forces a text run to exist before inserting the picture -- works
+      // around a Word Online bug (see below), off by default since it's
+      // only needed on retry.
+      async function attempt(workaround) {
         await Word.run(async (context) => {
-          let pic;
           const sel = context.document.getSelection();
           if (mode === 'replace') {
             const selectedPics = sel.inlinePictures;
             selectedPics.load('items');
             await context.sync();
             if (selectedPics.items.length === 0) {
-              setStatus('nothing selected to replace -- select a diagram first', 'error');
+              noSelection = true;
               return;
             }
           }
           // 'Replace' on a Range swaps out whatever's currently selected --
           // for a plain cursor (nothing selected) that just means "insert
           // here," which is what we want for both modes.
-          try {
-            pic = sel.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
-            await context.sync();
-          } catch (e) {
+          let insertSel = sel;
+          if (workaround) {
             // Word Online bug: inserting straight into a selection with no
-            // underlying run yet (e.g. an empty paragraph in a blank doc)
-            // throws "Cannot read properties of null (reading 'runIndex')".
-            // Forcing a run to exist first with a zero-width space works
-            // around it; the space is invisible and left in place.
-            if (!String(e.message).includes('runIndex')) throw e;
+            // underlying run yet throws "Cannot read properties of null
+            // (reading 'runIndex')". Forcing a run to exist first with an
+            // invisible zero-width space works around it.
             sel.insertText('​', Word.InsertLocation.replace);
             await context.sync();
-            const sel2 = context.document.getSelection();
-            pic = sel2.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
-            await context.sync();
+            insertSel = context.document.getSelection();
           }
+          const pic = insertSel.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
           // Canonical JSON, not the raw editor text -- keeps the round-trip
           // format fixed regardless of what shorthand the user typed.
           pic.altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
           await context.sync();
-          setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
         });
+      }
+
+      try {
+        try {
+          await attempt(false);
+        } catch (e) {
+          // A failed sync leaves its context unusable, so the retry has to
+          // run in a brand new Word.run rather than reusing anything above.
+          if (!String(e.message).includes('runIndex')) throw e;
+          await attempt(true);
+        }
+        setStatus(
+          noSelection ? 'nothing selected to replace -- select a diagram first' : (mode === 'replace' ? 'replaced' : 'inserted'),
+          noSelection ? 'error' : 'success'
+        );
       } catch (e) {
         setStatus('insert failed: ' + describeError(e), 'error');
       }
