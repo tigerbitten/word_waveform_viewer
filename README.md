@@ -37,6 +37,33 @@ the image's alt-text, so no companion files and no server needed.
    If bumping still doesn't work, sideload in a fresh private/incognito
    window.
 
+## LLM-readability
+
+A timing diagram inserted by this add-in is a PNG — an LLM reading the
+document has to interpret pixels, which it will do poorly or not at all,
+even with vision. The WaveJSON source is right there in the image's
+alt-text, but only some export formats keep it accessible:
+
+- **.docx** — alt-text is a real XML attribute (`wp:docPr descr`), extractable
+  by any tool that parses the docx directly (e.g. `python-docx`, or just
+  unzipping and reading `document.xml`).
+- **HTML** — Word's HTML export keeps alt-text verbatim as `<img alt="...">`.
+- **Markdown** (via Pandoc, from .docx or HTML) — alt-text carries into
+  `![alt](path)` syntax.
+- **PDF** — alt-text is dropped on export. This is the common case for
+  "send this doc out," and the one place the JSON is genuinely lost.
+
+Two things help an LLM actually use this:
+
+1. **Export as .docx, HTML, or Markdown instead of PDF** when the document
+   will be read by an LLM. No code change needed, just an export choice.
+2. **Tell the LLM where to look.** Timing diagrams read as opaque images by
+   default — a prompt instruction like *"timing diagrams in this document
+   are images; the exact WaveJSON source for each one is in that image's
+   alt-text — read it from there instead of trying to interpret the image"*
+   measurably improves how well the model understands them, since it's
+   reading structured data instead of guessing from a picture.
+
 ## Known limitations
 
 - PNG only, not SVG — Word's `insertInlinePictureFromBase64` rejects SVG.
