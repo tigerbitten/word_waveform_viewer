@@ -37,6 +37,37 @@ the image's alt-text, so no companion files and no server needed.
    If bumping still doesn't work, sideload in a fresh private/incognito
    window.
 
+## Desktop Word setup (per-person, not centralized)
+
+Desktop Word doesn't have an "Upload My Add-in" option like Word for the
+web — it only loads sideloaded add-ins from a network-shared folder it
+trusts. This is a one-time setup per machine; each person who wants to use
+this add-in on desktop Word repeats it themselves:
+
+1. Make a folder, e.g. `C:\AddinCatalog`.
+2. Right-click it → **Properties → Sharing → Share...** and share it (with
+   yourself is enough — it just needs to be a network share, not a plain
+   local folder, for Word to accept it as a catalog).
+3. Note the resulting UNC path, e.g. `\\<your-pc-name>\AddinCatalog`.
+4. Download `manifest.xml` from this repo (raw file:
+   `https://raw.githubusercontent.com/tigerbitten/word_waveform_viewer/master/manifest.xml`)
+   into that folder.
+5. In Word: **File → Options → Trust Center → Trust Center Settings →
+   Trusted Add-in Catalogs**. Paste the UNC path as the Catalog Url, check
+   **Show in Menu**, OK, OK, then fully restart Word.
+6. **Insert → Add-ins → My Add-ins → Shared Folder** — the add-in should
+   be listed there.
+
+The manifest still points `SourceLocation` at GitHub Pages, so the machine
+needs outbound HTTPS reach to `tigerbitten.github.io` and Microsoft's
+`office.js` CDN — worth checking first if step 6 doesn't work.
+
+This doesn't scale past a few people trying it informally. For team-wide
+rollout, the real path is centralized deployment via the Microsoft 365
+admin center (an admin pushes the manifest to a group, no per-machine Trust
+Center setup needed) — that requires admin rights this repo doesn't have
+any control over.
+
 ## LLM-readability
 
 A timing diagram inserted by this add-in is a PNG — an LLM reading the
@@ -74,7 +105,7 @@ Two things help an LLM actually use this:
 
 - PNG only, not SVG — Word's `insertInlinePictureFromBase64` rejects SVG.
   No resolution independence.
-- Tested on Word for the web only. Desktop Word untested so far.
+- Confirmed working on both Word for the web and desktop Word.
 - Alt-text capacity tested up to 200,000 characters with no truncation —
   not expected to be a real constraint.
 - **No offline mode.** Needs internet on every load: the taskpane itself
