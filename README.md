@@ -13,18 +13,19 @@ who wants to use this add-in on desktop Word repeats it themselves:
 
 1. Make a local folder, e.g. `C:\AddinCatalog`.
 2. Download `manifest.xml` from this repo into that folder.
-3. In Word: **File → Options → Trust Center → Trust Center Settings →
-   Trusted Add-in Catalogs**. As the Catalog Url, use
-   `\\localhost\c$\AddinCatalog` (swap in your actual folder path) — this
-   is Windows' built-in admin share, so it satisfies Word's network-path
-   requirement without actually sharing the folder. Check **Show in Menu**,
-   OK, OK, then fully restart Word.
-4. **Home → Add-ins → Advanced Settings → Shared Folder** — select the
+3. Right-click the folder → **Properties → Sharing → Share...**, add
+   yourself, share it. (The `\\localhost\c$\...` admin-share shortcut
+   doesn't work on locked-down/corporate machines — this is the reliable
+   path.) Note the resulting network path, e.g. `\\<your-pc-name>\AddinCatalog`.
+4. In Word: **File → Options → Trust Center → Trust Center Settings →
+   Trusted Add-in Catalogs**. Paste that network path as the Catalog Url,
+   check **Show in Menu**, OK, OK, then fully restart Word.
+5. **Home → Add-ins → Advanced Settings → Shared Folder** — select the
    add-in there.
 
 The manifest still points `SourceLocation` at GitHub Pages, so the machine
 needs outbound HTTPS reach to `tigerbitten.github.io` and Microsoft's
-`office.js` CDN — worth checking first if step 4 doesn't work.
+`office.js` CDN — worth checking first if step 5 doesn't work.
 
 ## Files
 
