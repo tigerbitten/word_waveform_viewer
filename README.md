@@ -11,11 +11,12 @@ who wants to use this add-in on desktop Word repeats it themselves:
 
 1. Make a local folder, e.g. `C:\AddinCatalog`.
 2. Download `manifest.xml` from this repo into that folder.
-3. Right-click the folder → **Properties → Sharing → Share...**, add
-   yourself, share it. Note the resulting network path, e.g. `\\<your-pc-name>\AddinCatalog`.
-4. In Word: **File → Options → Trust Center → Trust Center Settings →
-   Trusted Add-in Catalogs**. Paste that network path as the Catalog Url,
-   check **Show in Menu**, OK, OK, then fully restart Word.
+3. In Word: **File → Options → Trust Center → Trust Center Settings →
+   Trusted Add-in Catalogs**. As the Catalog Url, use
+   `\\localhost\c$\AddinCatalog` (swap in your actual folder path), check
+   **Show in Menu**, OK, OK, then fully restart Word. If that path doesn't
+   work, right-click the folder → **Properties → Sharing → Share...**, add
+   yourself, and use the resulting network path instead.
 5. Inside a Document, **Home → Add-ins → Advanced Settings → Shared Folder** — select the
    add-in there.
 
