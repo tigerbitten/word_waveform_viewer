@@ -14,9 +14,7 @@ who wants to use this add-in on desktop Word repeats it themselves:
 3. In Word: **File → Options → Trust Center → Trust Center Settings →
    Trusted Add-in Catalogs**. As the Catalog Url, use
    `\\localhost\c$\AddinCatalog` (swap in your actual folder path), check
-   **Show in Menu**, OK, OK, then fully restart Word. If that path doesn't
-   work, right-click the folder → **Properties → Sharing → Share...**, add
-   yourself, and use the resulting network path instead.
+   **Show in Menu**, OK, OK, then fully restart Word.
 5. Inside a Document, **Home → Add-ins → Advanced Settings → Shared Folder** — select the
    add-in there.
 
@@ -27,8 +25,7 @@ who wants to use this add-in on desktop Word repeats it themselves:
 2. **Insert new diagram** / **Replace selected diagram** rasterizes the SVG
    to PNG (Word rejects SVG directly) and inserts it, writing the JSON
    into the image's `altTextDescription`, prefixed with a sentinel
-   (`WAVEJSON:v1:`) so corrupted/foreign alt-text fails loudly instead of
-   silently.
+   (`WAVEJSON:v1:`) so corrupted/foreign alt-text fails loudly.
 3. **Load selected diagram** reads that alt-text back into the editor.
 
 ## Files
