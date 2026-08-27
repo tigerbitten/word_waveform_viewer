@@ -4,6 +4,28 @@ Word add-in: author WaveJSON timing diagrams (via WaveDrom), insert them as
 images, and edit them again later. The diagram's JSON source is stored in
 the image's alt-text, so no companion files and no server needed.
 
+## Desktop Word setup (per-person, not centralized)
+
+Desktop Word doesn't have an "Upload My Add-in" option like Word for the
+web — it only loads sideloaded add-ins from a folder it trusts, referenced
+as a network-style path. This is a one-time setup per machine; each person
+who wants to use this add-in on desktop Word repeats it themselves:
+
+1. Make a local folder, e.g. `C:\AddinCatalog`.
+2. Download `manifest.xml` from this repo into that folder.
+3. In Word: **File → Options → Trust Center → Trust Center Settings →
+   Trusted Add-in Catalogs**. As the Catalog Url, use
+   `\\localhost\c$\AddinCatalog` (swap in your actual folder path) — this
+   is Windows' built-in admin share, so it satisfies Word's network-path
+   requirement without actually sharing the folder. Check **Show in Menu**,
+   OK, OK, then fully restart Word.
+4. **Home → Add-ins → Advanced Settings → Shared Folder** — select the
+   add-in there.
+
+The manifest still points `SourceLocation` at GitHub Pages, so the machine
+needs outbound HTTPS reach to `tigerbitten.github.io` and Microsoft's
+`office.js` CDN — worth checking first if step 4 doesn't work.
+
 ## Files
 
 - `taskpane.html` — the whole add-in. Editor, WaveDrom render, Office.js
@@ -36,37 +58,6 @@ the image's alt-text, so no companion files and no server needed.
    Word caches aggressively and silently serves stale versions otherwise.
    If bumping still doesn't work, sideload in a fresh private/incognito
    window.
-
-## Desktop Word setup (per-person, not centralized)
-
-Desktop Word doesn't have an "Upload My Add-in" option like Word for the
-web — it only loads sideloaded add-ins from a network-shared folder it
-trusts. This is a one-time setup per machine; each person who wants to use
-this add-in on desktop Word repeats it themselves:
-
-1. Make a folder, e.g. `C:\AddinCatalog`.
-2. Right-click it → **Properties → Sharing → Share...** and share it (with
-   yourself is enough — it just needs to be a network share, not a plain
-   local folder, for Word to accept it as a catalog).
-3. Note the resulting UNC path, e.g. `\\<your-pc-name>\AddinCatalog`.
-4. Download `manifest.xml` from this repo (raw file:
-   `https://raw.githubusercontent.com/tigerbitten/word_waveform_viewer/master/manifest.xml`)
-   into that folder.
-5. In Word: **File → Options → Trust Center → Trust Center Settings →
-   Trusted Add-in Catalogs**. Paste the UNC path as the Catalog Url, check
-   **Show in Menu**, OK, OK, then fully restart Word.
-6. **Insert → Add-ins → My Add-ins → Shared Folder** — the add-in should
-   be listed there.
-
-The manifest still points `SourceLocation` at GitHub Pages, so the machine
-needs outbound HTTPS reach to `tigerbitten.github.io` and Microsoft's
-`office.js` CDN — worth checking first if step 6 doesn't work.
-
-This doesn't scale past a few people trying it informally. For team-wide
-rollout, the real path is centralized deployment via the Microsoft 365
-admin center (an admin pushes the manifest to a group, no per-machine Trust
-Center setup needed) — that requires admin rights this repo doesn't have
-any control over.
 
 ## LLM-readability
 
