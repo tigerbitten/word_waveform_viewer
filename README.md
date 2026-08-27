@@ -6,26 +6,29 @@ the image's alt-text, so no companion files and no server needed.
 
 ## Desktop Word setup (per-person, not centralized)
 
-Desktop Word doesn't have an "Upload My Add-in" option like Word for the
-web — it only loads sideloaded add-ins from a folder it trusts, referenced
-as a network-style path. This is a one-time setup per machine; each person
+This is a one-time setup per machine; each person
 who wants to use this add-in on desktop Word repeats it themselves:
 
 1. Make a local folder, e.g. `C:\AddinCatalog`.
 2. Download `manifest.xml` from this repo into that folder.
 3. Right-click the folder → **Properties → Sharing → Share...**, add
-   yourself, share it. (The `\\localhost\c$\...` admin-share shortcut
-   doesn't work on locked-down/corporate machines — this is the reliable
-   path.) Note the resulting network path, e.g. `\\<your-pc-name>\AddinCatalog`.
+   yourself, share it. Note the resulting network path, e.g. `\\<your-pc-name>\AddinCatalog`.
 4. In Word: **File → Options → Trust Center → Trust Center Settings →
    Trusted Add-in Catalogs**. Paste that network path as the Catalog Url,
    check **Show in Menu**, OK, OK, then fully restart Word.
-5. **Home → Add-ins → Advanced Settings → Shared Folder** — select the
+5. Inside a Document, **Home → Add-ins → Advanced Settings → Shared Folder** — select the
    add-in there.
 
-The manifest still points `SourceLocation` at GitHub Pages, so the machine
-needs outbound HTTPS reach to `tigerbitten.github.io` and Microsoft's
-`office.js` CDN — worth checking first if step 5 doesn't work.
+
+## How it works
+
+1. Edit WaveJSON in the taskpane, live preview renders via WaveDrom (SVG).
+2. **Insert new diagram** / **Replace selected diagram** rasterizes the SVG
+   to PNG (Word rejects SVG directly) and inserts it, writing the JSON
+   into the image's `altTextDescription`, prefixed with a sentinel
+   (`WAVEJSON:v1:`) so corrupted/foreign alt-text fails loudly instead of
+   silently.
+3. **Load selected diagram** reads that alt-text back into the editor.
 
 ## Files
 
@@ -38,31 +41,9 @@ needs outbound HTTPS reach to `tigerbitten.github.io` and Microsoft's
   into the repo instead of pulled from jsDelivr. `office.js` is still loaded
   from Microsoft's CDN (required — can't be self-hosted).
 
-## How it works
-
-1. Edit WaveJSON in the taskpane, live preview renders via WaveDrom (SVG).
-2. **Insert new diagram** / **Replace selected diagram** rasterizes the SVG
-   to PNG (Word rejects SVG directly) and inserts it, writing the JSON
-   into the image's `altTextDescription`, prefixed with a sentinel
-   (`WAVEJSON:v1:`) so corrupted/foreign alt-text fails loudly instead of
-   silently.
-3. **Load selected diagram** reads that alt-text back into the editor.
-
-## Testing (sideload, no store/IT approval needed)
-
-1. Host `taskpane.html` + `manifest.xml` somewhere HTTPS-reachable (this
-   repo uses GitHub Pages).
-2. In Word for the web: Insert → Add-ins → **Upload My Add-in**, choose
-   `manifest.xml`.
-3. **Whenever `taskpane.html` changes**, bump the `?v=N` in `manifest.xml`'s
-   `SourceLocation` and the `build vN` marker at the top of the taskpane —
-   Word caches aggressively and silently serves stale versions otherwise.
-   If bumping still doesn't work, sideload in a fresh private/incognito
-   window.
-
 ## LLM-readability
 
-A timing diagram inserted by this add-in is a PNG — an LLM reading the
+A timing diagram inserted by this add-in is a PNG, so an LLM reading the
 document has to interpret pixels, which it will do poorly or not at all,
 even with vision. The WaveJSON source is right there in the image's
 alt-text, but only some export formats keep it accessible:
