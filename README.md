@@ -10,7 +10,7 @@ This is a one-time setup per machine; each person
 who wants to use this add-in on desktop Word repeats it themselves:
 
 1. Make a local folder, e.g. `C:\AddinCatalog`.
-2. Download `manifest.xml` from this repo into that folder.
+2. Download `manifest.xml` from this repo into that folder. MAKE SURE TO USE THE GITHUB 'Download Raw File' BUTTON. The manifest file should be ~2KB.
 3. In Word: **File → Options → Trust Center → Trust Center Settings →
    Trusted Add-in Catalogs**. As the Catalog Url, use
    `\\localhost\c$\AddinCatalog` (swap in your actual folder path), check
@@ -71,17 +71,3 @@ Two things help an LLM actually use this:
    it won't be there"* measurably improves how well the model understands
    them, since it's reading structured data instead of guessing from a
    picture.
-
-## Known limitations
-
-- PNG only, not SVG — Word's `insertInlinePictureFromBase64` rejects SVG.
-  No resolution independence.
-- Confirmed working on both Word for the web and desktop Word.
-- Alt-text capacity tested up to 200,000 characters with no truncation —
-  not expected to be a real constraint.
-- **No offline mode.** Needs internet on every load: the taskpane itself
-  (GitHub Pages) and `office.js` (Microsoft's CDN, required to be loaded
-  live) are fetched live. WaveDrom itself is now vendored locally (see
-  `vendor/`), so it no longer depends on jsDelivr being reachable. Would
-  still fail entirely on a machine with no reach to GitHub Pages / the
-  Microsoft CDN. Possible future work: host the taskpane internally too.
