@@ -7,7 +7,9 @@ the image's alt-text, so no companion files and no server needed.
 ## Desktop Word setup (per-person, not centralized)
 
 This is a one-time setup per machine; each person
-who wants to use this add-in on desktop Word repeats it themselves:
+who wants to use this add-in on desktop Word repeats it themselves.
+
+### Windows
 
 1. Make a local folder, e.g. `C:\AddinCatalog`.
 2. Download `manifest.xml` from this repo into that folder. MAKE SURE TO USE THE GITHUB 'Download Raw File' BUTTON. The manifest file should be ~2KB.
@@ -15,18 +17,53 @@ who wants to use this add-in on desktop Word repeats it themselves:
    Trusted Add-in Catalogs**. As the Catalog Url, use
    `\\localhost\c$\AddinCatalog` (swap in your actual folder path), check
    **Show in Menu**, OK, OK, then fully restart Word.
-5. Inside a Document, **Home → Add-ins → Advanced Settings → Shared Folder** — select the
+4. Inside a Document, **Home → Add-ins → Advanced Settings → Shared Folder** — select the
    add-in there.
 
+### Mac
+
+1. Download `manifest.xml` from this repo. MAKE SURE TO USE THE GITHUB 'Download Raw File' BUTTON. The manifest file should be ~2KB.
+2. Run `mkdir -p ~/Library/Containers/com.microsoft.Word/Data/Documents/wef`
+3. Move `manifest.xml` into that `wef` folder.
+4. Quit Word completely, then reopen it.
+5. Inside a Document, **Home → Add-ins → Developer Add-ins** — select the add-in there. It may have a GitHub logo.
 
 ## How it works
 
-1. Edit WaveJSON in the taskpane, live preview renders via WaveDrom (SVG).
-2. **Insert new diagram** / **Replace selected diagram** rasterizes the SVG
-   to PNG (Word rejects SVG directly) and inserts it, writing the JSON
-   into the image's `altTextDescription`, prefixed with a sentinel
-   (`WAVEJSON:v1:`) so corrupted/foreign alt-text fails loudly.
-3. **Load selected diagram** reads that alt-text back into the editor.
+### The core loop
+
+1. Type or paste WaveJSON in the taskpane. The preview updates as you type.
+2. **Insert new diagram** — puts the diagram in your document at the cursor.
+3. Click a diagram, then **Load selected diagram** — pulls it back into the
+   editor to change it.
+4. **Replace selected diagram** — swaps the clicked diagram for the edited one.
+
+Every diagram carries its own source, so any of them can be reopened and
+edited later. No side files to keep track of.
+
+### The other editor buttons
+
+- **New (blank)** — resets the editor to a single empty signal.
+- **Add signal** — appends an empty signal to the `signal` array. Needs the
+  current JSON to parse first; it edits the parsed object, not the text.
+- **Copy JSON** — selects the editor text so you can press Ctrl+C. It does
+  not copy for you: `navigator.clipboard.writeText` is blocked by Word's
+  iframe permissions policy.
+
+Two editor conveniences that aren't buttons: drag the bar under the textarea
+to resize it, and Tab inserts an indent instead of jumping focus out.
+
+### Templates and cheat sheet
+
+Collapsed behind **Templates & wave-char cheat sheet**. Four templates —
+Clock, Data bus, Handshake (req/ack), and Edges (arrows between signals) —
+each of which *replaces* the whole editor contents, so they're a starting
+point, not something to click mid-edit.
+
+The cheat sheet table covers the wave characters (`p n P N 0 1 h l x z 2-9
+= . |`) and how bus labels pull from the `data` array. Arrows need a `node`
+string per signal plus a top-level `edge` array; the Edges template is the
+working example.
 
 ## Files
 
