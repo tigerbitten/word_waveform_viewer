@@ -9,9 +9,9 @@
   <ProviderName>prototype</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Waveform Viewer/Editor" />
-  <Description DefaultValue="WaveJSON to SVG timing diagrams in Word (prototype)" />
-  <IconUrl DefaultValue="https://github.githubassets.com/favicons/favicon.png" />
-  <HighResolutionIconUrl DefaultValue="https://github.githubassets.com/favicons/favicon.png" />
+  <Description DefaultValue="Insert and edit WaveJSON timing diagrams as editable SVG images in your document." />
+  <IconUrl DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/assets/icon-80.png" />
   <SupportUrl DefaultValue="https://github.com/tigerbitten/word_waveform_viewer" />
   <Hosts>
     <Host Name="Document" />
