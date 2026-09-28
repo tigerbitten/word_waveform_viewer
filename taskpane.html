@@ -33,7 +33,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v34</div>
+  <div style="color:#888;font-size:0.8em;">build v35</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -248,13 +248,11 @@
                 oldShape.load(['top', 'left', 'width', 'height', 'name']);
                 await context.sync();
                 
-                // Set options for the Common API to maintain position and scaling natively
                 insertOpts.imageLeft = oldShape.left;
                 insertOpts.imageTop = oldShape.top;
                 insertOpts.imageWidth = oldShape.width;
                 insertOpts.imageHeight = oldShape.height;
                 
-                // Rename instead of deleting so the slide doesn't drop the current selection
                 oldShapeName = 'WVD_OLD_' + Date.now();
                 oldShape.name = oldShapeName;
                 await context.sync();
@@ -281,7 +279,6 @@
                   shapes.load('items');
                   await context.sync();
                   
-                  // 1. Tag the NEW shape (which automatically became selected after insertion)
                   if (shapes.items.length > 0) {
                     const newShape = shapes.items[0];
                     const jsonStr = JSON.stringify(json);
@@ -295,7 +292,6 @@
                     await context.sync();
                   }
 
-                  // 2. Clean up the old shape safely
                   if (mode === 'replace' && oldShapeName) {
                     const slide = context.presentation.getSelectedSlides().getItemAt(0);
                     const slideShapes = slide.shapes;
@@ -413,7 +409,8 @@
               const shape = shapes.items[0];
               
               try {
-                shape.tags.load('items');
+                // EXPLICITLY LOAD KEY AND VALUE PROPERTIES 
+                shape.tags.load('key, value');
                 await context.sync();
                 
                 const chunkTag = shape.tags.items.find((t) => t.key === 'WAVEJSON_CHUNKS');
