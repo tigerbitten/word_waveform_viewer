@@ -44,7 +44,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v29</div>
+  <div style="color:#888;font-size:0.8em;">build v28</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -270,7 +270,9 @@
           );
         } else if (hostApp === Office.HostType.PowerPoint) {
           let noSelection = false;
-          // In replace mode, delete the existing shape before inserting the new one
+          let oldTop, oldLeft, oldWidth, oldHeight;
+
+          // In replace mode, extract geometry from the existing shape before deleting
           if (mode === 'replace') {
             await PowerPoint.run(async (context) => {
               const shapes = context.presentation.getSelectedShapes();
@@ -279,7 +281,16 @@
               if (shapes.items.length === 0) {
                 noSelection = true;
               } else {
-                shapes.items[0].delete();
+                const oldShape = shapes.items[0];
+                oldShape.load(['top', 'left', 'width', 'height']);
+                await context.sync();
+                
+                oldTop = oldShape.top;
+                oldLeft = oldShape.left;
+                oldWidth = oldShape.width;
+                oldHeight = oldShape.height;
+
+                oldShape.delete();
                 await context.sync();
               }
             });
@@ -298,20 +309,29 @@
                 resolve();
                 return;
               }
-              // Add alt-text to the newly inserted (and thus currently selected) shape
+              
+              // Apply metadata and restore position/size
               try {
                 await PowerPoint.run(async (context) => {
                   const shapes = context.presentation.getSelectedShapes();
                   shapes.load('items');
                   await context.sync();
                   if (shapes.items.length > 0) {
-                    shapes.items[0].altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
+                    const newShape = shapes.items[0];
+                    newShape.tags.add('WAVEJSON', JSON.stringify(json));
+                    
+                    if (mode === 'replace') {
+                      newShape.top = oldTop;
+                      newShape.left = oldLeft;
+                      newShape.width = oldWidth;
+                      newShape.height = oldHeight;
+                    }
                     await context.sync();
                   }
                 });
                 setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
               } catch (e) {
-                setStatus('inserted, but failed to save metadata: ' + describeError(e), 'warning');
+                setStatus('inserted, but failed to save metadata or dimensions: ' + describeError(e), 'warning');
               }
               resolve();
             });
@@ -403,16 +423,45 @@
               const shapes = context.presentation.getSelectedShapes();
               shapes.load('items');
               await context.sync();
+              
               if (shapes.items.length === 0) {
                 setStatus('select a diagram image first', 'error');
                 return;
               }
+              
               const shape = shapes.items[0];
-              shape.load('altTextDescription');
+              shape.tags.load('items');
               await context.sync();
               
-              const raw = shape.altTextDescription || '';
-              processLoadedData(raw);
+              // Search for the dedicated WAVEJSON tag
+              const waveTag = shape.tags.items.find((t) => t.key === 'WAVEJSON');
+              
+              if (waveTag) {
+                let json;
+                try {
+                  json = JSON.parse(waveTag.value);
+                } catch (e) {
+                  setStatus('diagram source is corrupted, refusing to load: ' + e.message, 'error');
+                  return;
+                }
+                src.value = JSON.stringify(json, null, 2);
+                render();
+                setStatus('loaded from selection', 'success');
+              } else {
+                // Fallback for diagrams previously saved with the alt-text script
+                try {
+                  shape.load('altTextDescription');
+                  await context.sync();
+                  const raw = shape.altTextDescription || '';
+                  if (raw.startsWith(ALT_TEXT_SENTINEL)) {
+                    processLoadedData(raw);
+                    return;
+                  }
+                } catch (fallbackErr) {
+                  // Ignore API errors on older host environments
+                }
+                setStatus('selected image has no recognizable waveform metadata', 'error');
+              }
             });
           }
         } catch (e) {
