@@ -249,13 +249,12 @@
           );
 
         } else if (hostApp === Office.HostType.PowerPoint) {
-          await PowerPoint.run(async (context) => {
-            const slide = context.presentation.getSelectedSlides().getItemAt(0);
-            
-            let options = {};
-            let noSelection = false;
+          let noSelection = false;
+          let oldTop, oldLeft, oldWidth, oldHeight;
+          let oldShapeName = null;
 
-            if (mode === 'replace') {
+          if (mode === 'replace') {
+            await PowerPoint.run(async (context) => {
               const shapes = context.presentation.getSelectedShapes();
               shapes.load('items');
               await context.sync();
@@ -264,33 +263,84 @@
                 noSelection = true;
               } else {
                 const oldShape = shapes.items[0];
-                oldShape.load(['left', 'top', 'width', 'height']);
+                oldShape.load(['top', 'left', 'width', 'height', 'name']);
                 await context.sync();
                 
-                // Copy the exact geometry of the shape we are replacing
-                options = {
-                  left: oldShape.left,
-                  top: oldShape.top,
-                  width: oldShape.width,
-                  height: oldShape.height
-                };
+                oldTop = oldShape.top;
+                oldLeft = oldShape.left;
+                oldWidth = oldShape.width;
+                oldHeight = oldShape.height;
                 
-                oldShape.delete();
+                // Rename instead of deleting so the slide doesn't lose its selection anchor
+                oldShapeName = 'WVD_OLD_' + Date.now();
+                oldShape.name = oldShapeName;
+                await context.sync();
               }
-            }
-            
-            if (noSelection) {
-              setStatus('nothing selected to replace -- select a diagram first', 'error');
-              return;
-            }
+            });
+          }
+          
+          if (noSelection) {
+            setStatus('nothing selected to replace -- select a diagram first', 'error');
+            return;
+          }
 
-            // addPicture guarantees we have a synchronous reference to the newly 
-            // generated shape, allowing us to safely bind our JSON metadata directly to it.
-            const newShape = slide.shapes.addPicture(base64, options);
-            newShape.altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
-            
-            await context.sync();
-            setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
+          // Use universally supported Common API to insert into PowerPoint
+          await new Promise((resolve) => {
+            Office.context.document.setSelectedDataAsync(base64, { coercionType: Office.CoercionType.Image }, async (result) => {
+              if (result.status === Office.AsyncResultStatus.Failed) {
+                setStatus('insert failed: ' + result.error.message, 'error');
+                resolve();
+                return;
+              }
+              
+              try {
+                await PowerPoint.run(async (context) => {
+                  const slide = context.presentation.getSelectedSlides().getItemAt(0);
+                  const shapes = context.presentation.getSelectedShapes();
+                  shapes.load('items');
+                  await context.sync();
+                  
+                  // 1. Configure the newly inserted shape (which is now actively selected)
+                  if (shapes.items.length > 0) {
+                    const newShape = shapes.items[0];
+                    
+                    if (mode === 'replace') {
+                      newShape.top = oldTop;
+                      newShape.left = oldLeft;
+                      newShape.width = oldWidth;
+                      newShape.height = oldHeight;
+                    }
+                    
+                    const jsonStr = JSON.stringify(json);
+                    const CHUNK_SIZE = 250;
+                    const chunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
+                    
+                    newShape.tags.add('WAVEJSON_CHUNKS', chunks.toString());
+                    for (let i = 0; i < chunks; i++) {
+                      newShape.tags.add('WAVEJSON_' + i, jsonStr.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
+                    }
+                    await context.sync();
+                  }
+
+                  // 2. Clean up the old shape safely
+                  if (mode === 'replace' && oldShapeName) {
+                    const slideShapes = slide.shapes;
+                    slideShapes.load('items');
+                    await context.sync();
+                    
+                    const oldShape = slideShapes.items.find(s => s.name === oldShapeName);
+                    if (oldShape) {
+                      oldShape.delete();
+                      await context.sync();
+                    }
+                  }
+                });
+                setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
+              } catch (e) {
+                setStatus('inserted, but failed to save metadata or dimensions: ' + describeError(e), 'warning');
+              }
+              resolve();
+            });
           });
         }
       } catch (e) {
@@ -388,7 +438,6 @@
               
               const shape = shapes.items[0];
               
-              // 1. Try reading standard alt text (primary method)
               shape.load('altTextDescription');
               await context.sync();
               
@@ -398,7 +447,6 @@
                 return;
               }
               
-              // 2. Fallback for backwards compatibility with the chunked tags fix
               try {
                 shape.tags.load('items');
                 await context.sync();
