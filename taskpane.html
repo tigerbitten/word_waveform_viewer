@@ -44,7 +44,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v31</div>
+  <div style="color:#888;font-size:0.8em;">build v32</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -112,8 +112,6 @@
     status.className = kind ? 'status-' + kind : '';
   }
 
-  // Common WaveJSON mistake: signals with different wave-string lengths
-  // render misaligned. Not fatal, so this warns rather than blocking.
   function checkWaveLengths(json) {
     if (!json || !Array.isArray(json.signal)) return null;
     const lengths = json.signal
@@ -125,8 +123,6 @@
     return 'wave length mismatch: ' + lengths.map((l) => l.name + '=' + l.len).join(', ');
   }
 
-  // Disables the main action buttons while an async Office run is in flight,
-  // so a double-click can't fire two inserts.
   async function withButtonsDisabled(fn) {
     const buttons = document.querySelectorAll('#actions button');
     buttons.forEach((b) => { b.disabled = true; });
@@ -138,10 +134,6 @@
   }
 
   function parseWaveJSON(text) {
-    // WaveJSON is written as a JS-object literal (unquoted keys, single
-    // quotes allowed), not strict JSON. Quote it into real JSON rather than
-    // eval-ing it, so a corrupted or hand-edited alt-text field can never
-    // execute code -- worst case it just fails to parse.
     const asJSON = text
       .replace(/'([^']*)'/g, '"$1"')
       .replace(/([{,]\s*)([A-Za-z_$][A-Za-z0-9_$]*)\s*:/g, '$1"$2":');
@@ -165,19 +157,9 @@
   }
 
   function describeError(e) {
-    // OfficeExtension errors often have an empty .message but a real .code / debugInfo.
     return (e && (e.code || e.message)) + ' | ' + JSON.stringify(e && e.debugInfo);
   }
 
-  function svgToBase64() {
-    const svg = target.querySelector('svg');
-    if (!svg) return null;
-    const svgString = new XMLSerializer().serializeToString(svg);
-    return btoa(unescape(encodeURIComponent(svgString)));
-  }
-
-  // Word's insertInlinePictureFromBase64 rejects SVG (GeneralException).
-  // Rasterize to PNG via canvas first.
   function svgToPngBase64() {
     const svg = target.querySelector('svg');
     if (!svg) return Promise.resolve(null);
@@ -192,7 +174,7 @@
         canvas.width = width;
         canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/png').split(',')[1]); // strip "data:image/png;base64,"
+        resolve(canvas.toDataURL('image/png').split(',')[1]); 
       };
       img.onerror = reject;
       img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
@@ -200,9 +182,7 @@
   }
 
   const TEMPLATES = {
-    tplClock: { signal: [
-      { name: 'clk', wave: 'p.......' }
-    ]},
+    tplClock: { signal: [ { name: 'clk', wave: 'p.......' } ]},
     tplBus: { signal: [
       { name: 'clk',  wave: 'p.......' },
       { name: 'data', wave: 'x.345x..', data: ['a', 'b', 'c'] }
@@ -222,9 +202,6 @@
     }
   };
 
-  // Shared by both Insert and Replace: rasterize the current editor
-  // content, then place it either at the end of the doc or over the
-  // current selection, adapting to whichever host application is running.
   async function insertOrReplace(mode) {
     await withButtonsDisabled(async () => {
       let base64;
@@ -235,6 +212,7 @@
         return;
       }
       if (!base64) { setStatus('nothing rendered to insert', 'error'); return; }
+      
       let json;
       try {
         json = parseWaveJSON(src.value);
@@ -242,12 +220,14 @@
         setStatus('parse error, not inserting: ' + e.message, 'error');
         return;
       }
+      
       try {
         if (hostApp === Office.HostType.Word) {
           let noSelection = false;
           await Word.run(async (context) => {
             const sel = context.document.getSelection();
             let location = Word.InsertLocation.after;
+            
             if (mode === 'replace') {
               const selectedPics = sel.inlinePictures;
               selectedPics.load('items');
@@ -258,6 +238,7 @@
               }
               location = Word.InsertLocation.replace;
             }
+            
             const pic = sel.insertInlinePictureFromBase64(base64, location);
             pic.altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
             await context.sync();
@@ -266,85 +247,50 @@
             noSelection ? 'nothing selected to replace -- select a diagram first' : (mode === 'replace' ? 'replaced' : 'inserted'),
             noSelection ? 'error' : 'success'
           );
-        } else if (hostApp === Office.HostType.PowerPoint) {
-          let noSelection = false;
-          let oldTop, oldLeft, oldWidth, oldHeight;
 
-          // In replace mode, extract geometry from the existing shape before deleting
-          if (mode === 'replace') {
-            await PowerPoint.run(async (context) => {
+        } else if (hostApp === Office.HostType.PowerPoint) {
+          await PowerPoint.run(async (context) => {
+            const slide = context.presentation.getSelectedSlides().getItemAt(0);
+            
+            let options = {};
+            let noSelection = false;
+
+            if (mode === 'replace') {
               const shapes = context.presentation.getSelectedShapes();
               shapes.load('items');
               await context.sync();
+              
               if (shapes.items.length === 0) {
                 noSelection = true;
               } else {
                 const oldShape = shapes.items[0];
-                oldShape.load(['top', 'left', 'width', 'height']);
+                oldShape.load(['left', 'top', 'width', 'height']);
                 await context.sync();
                 
-                oldTop = oldShape.top;
-                oldLeft = oldShape.left;
-                oldWidth = oldShape.width;
-                oldHeight = oldShape.height;
-
+                // Copy the exact geometry of the shape we are replacing
+                options = {
+                  left: oldShape.left,
+                  top: oldShape.top,
+                  width: oldShape.width,
+                  height: oldShape.height
+                };
+                
                 oldShape.delete();
-                await context.sync();
               }
-            });
-          }
-          
-          if (noSelection) {
-            setStatus('nothing selected to replace -- select a diagram first', 'error');
-            return;
-          }
+            }
+            
+            if (noSelection) {
+              setStatus('nothing selected to replace -- select a diagram first', 'error');
+              return;
+            }
 
-          // Use Common API to insert into PowerPoint
-          await new Promise((resolve) => {
-            Office.context.document.setSelectedDataAsync(base64, { coercionType: Office.CoercionType.Image }, async (result) => {
-              if (result.status === Office.AsyncResultStatus.Failed) {
-                setStatus('insert failed: ' + result.error.message, 'error');
-                resolve();
-                return;
-              }
-              
-              // Apply metadata and restore position/size
-              try {
-                await PowerPoint.run(async (context) => {
-                  const shapes = context.presentation.getSelectedShapes();
-                  shapes.load('items');
-                  await context.sync();
-                  
-                  if (shapes.items.length > 0) {
-                    const newShape = shapes.items[0];
-                    
-                    // 1. Restore dimensions FIRST (before any tag limits can crash the script)
-                    if (mode === 'replace') {
-                      newShape.top = oldTop;
-                      newShape.left = oldLeft;
-                      newShape.width = oldWidth;
-                      newShape.height = oldHeight;
-                    }
-                    
-                    // 2. Save JSON into chunked tags (max 255 chars per tag)
-                    const jsonStr = JSON.stringify(json);
-                    const CHUNK_SIZE = 250;
-                    const chunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
-                    
-                    newShape.tags.add('WAVEJSON_CHUNKS', chunks.toString());
-                    for (let i = 0; i < chunks; i++) {
-                      newShape.tags.add('WAVEJSON_' + i, jsonStr.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
-                    }
-                    
-                    await context.sync();
-                  }
-                });
-                setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
-              } catch (e) {
-                setStatus('inserted, but failed to save metadata or dimensions: ' + describeError(e), 'warning');
-              }
-              resolve();
-            });
+            // addPicture guarantees we have a synchronous reference to the newly 
+            // generated shape, allowing us to safely bind our JSON metadata directly to it.
+            const newShape = slide.shapes.addPicture(base64, options);
+            newShape.altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
+            
+            await context.sync();
+            setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
           });
         }
       } catch (e) {
@@ -353,8 +299,6 @@
     });
   }
 
-  // Custom drag bar for the editor -- the native textarea corner grip is
-  // too small to reliably grab.
   (function setupResizeHandle() {
     const handle = document.getElementById('resizeHandle');
     let startY = 0;
@@ -417,10 +361,12 @@
               const pics = sel.inlinePictures;
               pics.load('items');
               await context.sync();
+              
               if (pics.items.length === 0) {
                 setStatus('select a diagram image first', 'error');
                 return;
               }
+              
               const pic = pics.items[0];
               pic.load('altTextDescription');
               await context.sync();
@@ -428,6 +374,7 @@
               const raw = pic.altTextDescription || '';
               processLoadedData(raw);
             });
+            
           } else if (hostApp === Office.HostType.PowerPoint) {
             await PowerPoint.run(async (context) => {
               const shapes = context.presentation.getSelectedShapes();
@@ -440,52 +387,45 @@
               }
               
               const shape = shapes.items[0];
-              shape.tags.load('items');
+              
+              // 1. Try reading standard alt text (primary method)
+              shape.load('altTextDescription');
               await context.sync();
               
-              // Load the chunked tags back into a single string
-              const chunkTag = shape.tags.items.find((t) => t.key === 'WAVEJSON_CHUNKS');
-              const waveTag = shape.tags.items.find((t) => t.key === 'WAVEJSON'); // For small/legacy saves
-              
-              let rawJsonStr = '';
-              if (chunkTag) {
-                const chunks = parseInt(chunkTag.value, 10);
-                for (let i = 0; i < chunks; i++) {
-                  const cTag = shape.tags.items.find((t) => t.key === 'WAVEJSON_' + i);
-                  if (cTag) {
-                    rawJsonStr += cTag.value;
-                  }
-                }
-              } else if (waveTag) {
-                rawJsonStr = waveTag.value;
+              const raw = shape.altTextDescription || '';
+              if (raw.startsWith(ALT_TEXT_SENTINEL)) {
+                processLoadedData(raw);
+                return;
               }
               
-              // Process the extracted string
-              if (rawJsonStr) {
-                let json;
-                try {
-                  json = JSON.parse(rawJsonStr);
-                } catch (e) {
-                  setStatus('diagram source is corrupted, refusing to load: ' + e.message, 'error');
+              // 2. Fallback for backwards compatibility with the chunked tags fix
+              try {
+                shape.tags.load('items');
+                await context.sync();
+                
+                const chunkTag = shape.tags.items.find((t) => t.key === 'WAVEJSON_CHUNKS');
+                const waveTag = shape.tags.items.find((t) => t.key === 'WAVEJSON');
+                
+                let rawJsonStr = '';
+                if (chunkTag) {
+                  const chunks = parseInt(chunkTag.value, 10);
+                  for (let i = 0; i < chunks; i++) {
+                    const cTag = shape.tags.items.find((t) => t.key === 'WAVEJSON_' + i);
+                    if (cTag) rawJsonStr += cTag.value;
+                  }
+                } else if (waveTag) {
+                  rawJsonStr = waveTag.value;
+                }
+                
+                if (rawJsonStr) {
+                  processLoadedData(ALT_TEXT_SENTINEL + rawJsonStr);
                   return;
                 }
-                src.value = JSON.stringify(json, null, 2);
-                render();
-                setStatus('loaded from selection', 'success');
-              } else {
-                // Final fallback: try alt-text in case it was saved before the tags fix
-                try {
-                  shape.load('altTextDescription');
-                  await context.sync();
-                  const raw = shape.altTextDescription || '';
-                  if (raw.startsWith(ALT_TEXT_SENTINEL)) {
-                    processLoadedData(raw);
-                    return;
-                  }
-                } catch (fallbackErr) { }
-                
-                setStatus('selected image has no recognizable waveform metadata', 'error');
+              } catch (tagErr) {
+                 // Ignore if tags aren't loaded or supported
               }
+              
+              setStatus('selected image has no recognizable waveform metadata', 'error');
             });
           }
         } catch (e) {
