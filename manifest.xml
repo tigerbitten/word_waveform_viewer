@@ -6,7 +6,7 @@
     xsi:type="TaskPaneApp">
   <Id>6ed19394-100a-430d-9051-cb1c322260ec</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>build 29</ProviderName>
+  <ProviderName>build 30</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Waveform Viewer/Editor" />
   <Description DefaultValue="Insert and edit WaveJSON timing diagrams as editable SVG images in your document." />
@@ -14,11 +14,11 @@
   <HighResolutionIconUrl DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/assets/icon-80.png" />
   <SupportUrl DefaultValue="https://github.com/tigerbitten/word_waveform_viewer" />
   <Hosts>
-      <Host Name="Document" />
-      <Host Name="Presentation" />
+    <Host Name="Document" />
+    <Host Name="Presentation" />
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/taskpane.html?v=29" />
+    <SourceLocation DefaultValue="https://tigerbitten.github.io/word_waveform_viewer/taskpane.html?v=30" />
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
 </OfficeApp>
