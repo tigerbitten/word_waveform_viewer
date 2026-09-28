@@ -7,19 +7,12 @@
 <script src="vendor/default.js"></script>
 <script src="vendor/wavedrom.min.js"></script>
 <style>
-  /* Fixed light appearance regardless of Word's theme -- avoids chasing
-     an unreliable dark-mode signal from inside the taskpane iframe. */
   body { font-family: monospace; margin: 0.5rem 0.5rem 0.5rem 1rem; background: #fff; color: #000; }
-  /* left padding on the textarea itself too -- keeps the text cursor away
-     from the pane's own left-edge drag zone, and native corner grip is
-     tiny so we use our own resize bar below instead. */
   textarea { width: 100%; height: 16rem; resize: none; box-sizing: border-box;
     padding: 0.4rem 0.4rem 0.4rem 0.6rem; line-height: 1.4; }
   #resizeHandle { height: 14px; background: #ddd; border: 1px solid #bbb; border-top: none;
     cursor: ns-resize; text-align: center; font-size: 0.7rem; line-height: 14px; user-select: none; }
   #target { border: 1px solid #ccc; margin: 0.5rem 0; min-height: 4rem; }
-  /* Reserves its height even when empty, so nothing jumps when a message
-     appears -- but stays visually blank (no border/background) until then. */
   #status { white-space: pre-wrap; min-height: 1.2em; margin: 0.5rem 0; padding: 0.35rem 0.6rem;
     border: 1px solid transparent; border-radius: 4px; background: transparent; }
   #status.status-error { color: #b00020; background: #fdecec; border-color: #f3b8b8; }
@@ -29,22 +22,18 @@
   summary { cursor: pointer; }
   table.legend { border-collapse: collapse; margin-top: 0.5rem; }
   table.legend td, table.legend th { border: 1px solid #888; padding: 0.15rem 0.4rem; text-align: left; }
-  /* Secondary is the default look; .primary marks the two main actions
-     (Insert / Replace) so they read faster than Load/New/templates. */
   button { margin: 0; border-radius: 4px; padding: 0.35rem 0.7rem; cursor: pointer;
     background: #f3f3f3; color: #111; border: 1px solid #bbb; }
   button.primary { background: #2563eb; color: #fff; border-color: #1d4ed8; }
   button.primary:hover:not(:disabled) { background: #1d4ed8; }
   button:disabled { opacity: 0.5; cursor: default; }
-  /* One consistent look for every button group: bordered box, small label,
-     buttons in a wrapping row with a fixed gap (not per-button margins). */
   .btn-group { border: 1px solid #ccc; border-radius: 4px; padding: 0.4rem; margin: 0.5rem 0; }
   .btn-group .label { font-size: 0.75rem; color: #666; margin-bottom: 0.3rem; }
   .btn-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v33</div>
+  <div style="color:#888;font-size:0.8em;">build v34</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -91,12 +80,6 @@
       <tr><td>.</td><td>repeat the previous cycle</td></tr>
       <tr><td>|</td><td>gap in the timeline</td></tr>
     </table>
-    <p>Arrows between signals need a separate <code>node</code> string per
-    signal, same length as <code>wave</code>, marking each arrow endpoint
-    with a letter (<code>.</code> elsewhere), then a top-level
-    <code>edge</code> array referencing those letters, e.g.
-    <code>node: "..a...."</code> / <code>edge: ["a~&gt;b"]</code>. See the
-    Edges template for a working example.</p>
   </details>
 
 <script>
@@ -104,7 +87,6 @@
   const src = document.getElementById('src');
   const target = document.getElementById('target');
   const status = document.getElementById('status');
-
   const ALT_TEXT_SENTINEL = 'WAVEJSON:v1:';
 
   function setStatus(text, kind) {
@@ -250,7 +232,7 @@
 
         } else if (hostApp === Office.HostType.PowerPoint) {
           let noSelection = false;
-          let oldTop, oldLeft, oldWidth, oldHeight;
+          let insertOpts = { coercionType: Office.CoercionType.Image };
           let oldShapeName = null;
 
           if (mode === 'replace') {
@@ -266,12 +248,13 @@
                 oldShape.load(['top', 'left', 'width', 'height', 'name']);
                 await context.sync();
                 
-                oldTop = oldShape.top;
-                oldLeft = oldShape.left;
-                oldWidth = oldShape.width;
-                oldHeight = oldShape.height;
+                // Set options for the Common API to maintain position and scaling natively
+                insertOpts.imageLeft = oldShape.left;
+                insertOpts.imageTop = oldShape.top;
+                insertOpts.imageWidth = oldShape.width;
+                insertOpts.imageHeight = oldShape.height;
                 
-                // Rename instead of deleting so the slide doesn't lose its selection anchor
+                // Rename instead of deleting so the slide doesn't drop the current selection
                 oldShapeName = 'WVD_OLD_' + Date.now();
                 oldShape.name = oldShapeName;
                 await context.sync();
@@ -284,9 +267,8 @@
             return;
           }
 
-          // Use universally supported Common API to insert into PowerPoint
           await new Promise((resolve) => {
-            Office.context.document.setSelectedDataAsync(base64, { coercionType: Office.CoercionType.Image }, async (result) => {
+            Office.context.document.setSelectedDataAsync(base64, insertOpts, async (result) => {
               if (result.status === Office.AsyncResultStatus.Failed) {
                 setStatus('insert failed: ' + result.error.message, 'error');
                 resolve();
@@ -295,22 +277,13 @@
               
               try {
                 await PowerPoint.run(async (context) => {
-                  const slide = context.presentation.getSelectedSlides().getItemAt(0);
                   const shapes = context.presentation.getSelectedShapes();
                   shapes.load('items');
                   await context.sync();
                   
-                  // 1. Configure the newly inserted shape (which is now actively selected)
+                  // 1. Tag the NEW shape (which automatically became selected after insertion)
                   if (shapes.items.length > 0) {
                     const newShape = shapes.items[0];
-                    
-                    if (mode === 'replace') {
-                      newShape.top = oldTop;
-                      newShape.left = oldLeft;
-                      newShape.width = oldWidth;
-                      newShape.height = oldHeight;
-                    }
-                    
                     const jsonStr = JSON.stringify(json);
                     const CHUNK_SIZE = 250;
                     const chunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
@@ -324,6 +297,7 @@
 
                   // 2. Clean up the old shape safely
                   if (mode === 'replace' && oldShapeName) {
+                    const slide = context.presentation.getSelectedSlides().getItemAt(0);
                     const slideShapes = slide.shapes;
                     slideShapes.load('items');
                     await context.sync();
@@ -337,7 +311,7 @@
                 });
                 setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
               } catch (e) {
-                setStatus('inserted, but failed to save metadata or dimensions: ' + describeError(e), 'warning');
+                setStatus('inserted, but failed to save metadata tags: ' + describeError(e), 'warning');
               }
               resolve();
             });
@@ -437,15 +411,6 @@
               }
               
               const shape = shapes.items[0];
-              
-              shape.load('altTextDescription');
-              await context.sync();
-              
-              const raw = shape.altTextDescription || '';
-              if (raw.startsWith(ALT_TEXT_SENTINEL)) {
-                processLoadedData(raw);
-                return;
-              }
               
               try {
                 shape.tags.load('items');
