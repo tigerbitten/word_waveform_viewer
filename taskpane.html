@@ -33,7 +33,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v35</div>
+  <div style="color:#888;font-size:0.8em;">build v36</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -233,7 +233,6 @@
         } else if (hostApp === Office.HostType.PowerPoint) {
           let noSelection = false;
           let insertOpts = { coercionType: Office.CoercionType.Image };
-          let oldShapeName = null;
 
           if (mode === 'replace') {
             await PowerPoint.run(async (context) => {
@@ -245,17 +244,15 @@
                 noSelection = true;
               } else {
                 const oldShape = shapes.items[0];
-                oldShape.load(['top', 'left', 'width', 'height', 'name']);
+                oldShape.load(['top', 'left', 'width', 'height']);
                 await context.sync();
                 
+                // Read the old dimensions. We DO NOT delete the shape here, 
+                // we let setSelectedDataAsync natively overwrite the selection.
                 insertOpts.imageLeft = oldShape.left;
                 insertOpts.imageTop = oldShape.top;
                 insertOpts.imageWidth = oldShape.width;
                 insertOpts.imageHeight = oldShape.height;
-                
-                oldShapeName = 'WVD_OLD_' + Date.now();
-                oldShape.name = oldShapeName;
-                await context.sync();
               }
             });
           }
@@ -273,41 +270,42 @@
                 return;
               }
               
-              try {
-                await PowerPoint.run(async (context) => {
-                  const shapes = context.presentation.getSelectedShapes();
-                  shapes.load('items');
-                  await context.sync();
-                  
-                  if (shapes.items.length > 0) {
-                    const newShape = shapes.items[0];
-                    const jsonStr = JSON.stringify(json);
-                    const CHUNK_SIZE = 250;
-                    const chunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
-                    
-                    newShape.tags.add('WAVEJSON_CHUNKS', chunks.toString());
-                    for (let i = 0; i < chunks; i++) {
-                      newShape.tags.add('WAVEJSON_' + i, jsonStr.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
-                    }
-                    await context.sync();
-                  }
-
-                  if (mode === 'replace' && oldShapeName) {
-                    const slide = context.presentation.getSelectedSlides().getItemAt(0);
-                    const slideShapes = slide.shapes;
-                    slideShapes.load('items');
+              // RETRY LOOP: Overcomes the async race condition in PowerPoint
+              // Office takes time to establish the newly inserted object as "selected".
+              let success = false;
+              for (let attempt = 0; attempt < 5; attempt++) {
+                await new Promise(r => setTimeout(r, 200)); 
+                try {
+                  success = await PowerPoint.run(async (context) => {
+                    const shapes = context.presentation.getSelectedShapes();
+                    shapes.load('items');
                     await context.sync();
                     
-                    const oldShape = slideShapes.items.find(s => s.name === oldShapeName);
-                    if (oldShape) {
-                      oldShape.delete();
+                    if (shapes.items.length > 0) {
+                      const newShape = shapes.items[0];
+                      const jsonStr = JSON.stringify(json);
+                      const CHUNK_SIZE = 250;
+                      const chunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
+                      
+                      newShape.tags.add('WAVEJSON_CHUNKS', chunks.toString());
+                      for (let i = 0; i < chunks; i++) {
+                        newShape.tags.add('WAVEJSON_' + i, jsonStr.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
+                      }
                       await context.sync();
+                      return true;
                     }
-                  }
-                });
+                    return false;
+                  });
+                  if (success) break;
+                } catch (e) {
+                  // Ignore and retry
+                }
+              }
+
+              if (success) {
                 setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
-              } catch (e) {
-                setStatus('inserted, but failed to save metadata tags: ' + describeError(e), 'warning');
+              } else {
+                setStatus('inserted, but failed to save metadata tags. Loading will not work.', 'warning');
               }
               resolve();
             });
@@ -409,18 +407,18 @@
               const shape = shapes.items[0];
               
               try {
-                // EXPLICITLY LOAD KEY AND VALUE PROPERTIES 
                 shape.tags.load('key, value');
                 await context.sync();
                 
-                const chunkTag = shape.tags.items.find((t) => t.key === 'WAVEJSON_CHUNKS');
-                const waveTag = shape.tags.items.find((t) => t.key === 'WAVEJSON');
+                // .toUpperCase protects against Office internally modifying case rules 
+                const chunkTag = shape.tags.items.find((t) => t.key.toUpperCase() === 'WAVEJSON_CHUNKS');
+                const waveTag = shape.tags.items.find((t) => t.key.toUpperCase() === 'WAVEJSON');
                 
                 let rawJsonStr = '';
                 if (chunkTag) {
                   const chunks = parseInt(chunkTag.value, 10);
                   for (let i = 0; i < chunks; i++) {
-                    const cTag = shape.tags.items.find((t) => t.key === 'WAVEJSON_' + i);
+                    const cTag = shape.tags.items.find((t) => t.key.toUpperCase() === 'WAVEJSON_' + i);
                     if (cTag) rawJsonStr += cTag.value;
                   }
                 } else if (waveTag) {
@@ -432,7 +430,7 @@
                   return;
                 }
               } catch (tagErr) {
-                 // Ignore if tags aren't loaded or supported
+                 // Fall back safely if tags aren't loaded or supported
               }
               
               setStatus('selected image has no recognizable waveform metadata', 'error');
