@@ -297,7 +297,7 @@
             await context.sync();
             beforeIds = new Set(slideShapes.items.map((s) => s.id));
             const s = selected.items[0];
-            if (mode === 'replace' && s && s.type === PowerPoint.ShapeType.image) {
+            if (mode === 'replace' && s) {
               old = { id: s.id, left: s.left, top: s.top, width: s.width };
             }
           });
