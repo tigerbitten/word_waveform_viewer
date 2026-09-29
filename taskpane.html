@@ -33,7 +33,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v38</div>
+  <div style="color:#888;font-size:0.8em;">build v39</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -142,7 +142,9 @@
   }
 
   function describeError(e) {
-    return (e && (e.code || e.message)) + ' | ' + JSON.stringify(e && e.debugInfo);
+    // Both: common-API errors (setSelectedDataAsync) carry a bare numeric code
+    // with the useful text in message.
+    return (e && [e.code, e.message].filter(Boolean).join(': ')) + ' | ' + JSON.stringify(e && e.debugInfo);
   }
 
   // Rasterize at 2x so the diagram stays sharp when enlarged or projected. The PNG
@@ -445,10 +447,23 @@
                 return;
               }
               
-              const tag = shapes.items[0].tags.getItemOrNullObject('WAVEJSON');
+              const shape = shapes.items[0];
+              const tag = shape.tags.getItemOrNullObject('WAVEJSON');
               tag.load('value');
               await context.sync();
-              processLoadedData(tag.isNullObject ? '' : tag.value);
+              if (tag.isNullObject) {
+                // Show what PowerPoint actually has on this shape, so a failed load
+                // (wrong shape selected, unsaved deck, older build) is diagnosable.
+                shape.load('id,type,name');
+                shape.tags.load('key');
+                await context.sync();
+                const keys = shape.tags.items.map((t) => t.key);
+                console.log('ppt load: no WAVEJSON tag', shape.id, shape.type, shape.name, keys);
+                setStatus('selected shape has no WAVEJSON tag -- type=' + shape.type +
+                  ', name="' + shape.name + '", tags=[' + keys.join(', ') + ']', 'error');
+                return;
+              }
+              processLoadedData(tag.value);
             });
           } else {
             throw new Error('unsupported host: ' + hostApp);
