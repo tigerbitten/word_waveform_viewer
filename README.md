@@ -4,6 +4,8 @@ Word add-in: author WaveJSON timing diagrams (via WaveDrom), insert them as
 images, and edit them again later. The diagram's JSON source is stored in
 the image's alt-text, so no companion files and no server needed.
 
+Also works in PowerPoint (same manifest), where the source is stored in a shape tag instead of alt-text.
+
 ## Desktop Word setup (per-person, not centralized)
 
 This is a one-time setup per machine; each person
