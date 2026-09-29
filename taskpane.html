@@ -33,7 +33,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v37</div>
+  <div style="color:#888;font-size:0.8em;">build v38</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -247,7 +247,7 @@
                 await context.sync();
                 // Replace the picture itself, not the whole selection, so any text
                 // selected along with it isn't wiped out.
-                pic = inline.insertInlinePicture(base64, Word.InsertLocation.replace);
+                pic = inline.insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
                 pic.width = inline.width;
                 pic.height = inline.width * aspect;
               } else if (floating) {
