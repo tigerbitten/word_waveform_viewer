@@ -33,7 +33,7 @@
 </style>
 </head>
 <body>
-  <div style="color:#888;font-size:0.8em;">build v36</div>
+  <div style="color:#888;font-size:0.8em;">build v37</div>
   <textarea id="src">{ signal: [
     { name: "clk",  wave: "p......." },
     { name: "data", wave: "x.345x..", data: ["a","b","c"] },
@@ -116,6 +116,9 @@
   }
 
   function parseWaveJSON(text) {
+    // Strict JSON first: the loose rewrite below mangles apostrophes inside
+    // double-quoted strings (e.g. "don't care"), and loaded diagrams are strict JSON.
+    try { return JSON.parse(text); } catch (e) { /* fall through to WaveDrom's relaxed syntax */ }
     const asJSON = text
       .replace(/'([^']*)'/g, '"$1"')
       .replace(/([{,]\s*)([A-Za-z_$][A-Za-z0-9_$]*)\s*:/g, '$1"$2":');
@@ -142,7 +145,11 @@
     return (e && (e.code || e.message)) + ' | ' + JSON.stringify(e && e.debugInfo);
   }
 
-  function svgToPngBase64() {
+  // Rasterize at 2x so the diagram stays sharp when enlarged or projected. The PNG
+  // is then twice its intended size, so callers must set the picture's size
+  // explicitly from the returned width/height (in points: 1 CSS px = 0.75 pt).
+  const RENDER_SCALE = 2;
+  function svgToPng() {
     const svg = target.querySelector('svg');
     if (!svg) return Promise.resolve(null);
     const svgString = new XMLSerializer().serializeToString(svg);
@@ -153,10 +160,14 @@
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/png').split(',')[1]); 
+        canvas.width = width * RENDER_SCALE;
+        canvas.height = height * RENDER_SCALE;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve({
+          base64: canvas.toDataURL('image/png').split(',')[1],
+          width: width * 0.75,
+          height: height * 0.75,
+        });
       };
       img.onerror = reject;
       img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
@@ -184,16 +195,34 @@
     }
   };
 
+  // Word keeps in-line-with-text pictures and floating (wrapped) pictures in separate
+  // collections. Floating ones are only reachable via WordApiDesktop 1.2, i.e. desktop
+  // Word, not Word on the web. Returns { inline } or { floating } or {} if neither.
+  async function getSelectedWordPicture(context, sel) {
+    const inline = sel.inlinePictures;
+    inline.load('items');
+    await context.sync();
+    if (inline.items.length > 0) return { inline: inline.items[0] };
+    if (!Office.context.requirements.isSetSupported('WordApiDesktop', '1.2')) return {};
+    const shapes = sel.shapes;
+    shapes.load('items/type');
+    await context.sync();
+    console.log('word selection: floating shape types', shapes.items.map((s) => s.type));
+    return { floating: shapes.items.find((s) => s.type === Word.ShapeType.picture) };
+  }
+
   async function insertOrReplace(mode) {
     await withButtonsDisabled(async () => {
-      let base64;
+      let png;
       try {
-        base64 = await svgToPngBase64();
+        png = await svgToPng();
       } catch (e) {
         setStatus('rasterize failed: ' + describeError(e), 'error');
         return;
       }
-      if (!base64) { setStatus('nothing rendered to insert', 'error'); return; }
+      if (!png) { setStatus('nothing rendered to insert', 'error'); return; }
+      const base64 = png.base64;
+      const aspect = png.height / png.width;
       
       let json;
       try {
@@ -208,20 +237,41 @@
           let noSelection = false;
           await Word.run(async (context) => {
             const sel = context.document.getSelection();
-            let location = Word.InsertLocation.after;
-            
+            let pic;
             if (mode === 'replace') {
-              const selectedPics = sel.inlinePictures;
-              selectedPics.load('items');
-              await context.sync();
-              if (selectedPics.items.length === 0) {
+              const { inline, floating } = await getSelectedWordPicture(context, sel);
+              // Keep the user's width; height follows the new diagram's aspect ratio
+              // so an added signal doesn't get squashed.
+              if (inline) {
+                inline.load('width');
+                await context.sync();
+                // Replace the picture itself, not the whole selection, so any text
+                // selected along with it isn't wiped out.
+                pic = inline.insertInlinePicture(base64, Word.InsertLocation.replace);
+                pic.width = inline.width;
+                pic.height = inline.width * aspect;
+              } else if (floating) {
+                floating.load('left,top,width,relativeHorizontalPosition,relativeVerticalPosition,textWrap/type');
+                await context.sync();
+                // There's no "swap the image" call for a floating picture, so insert a
+                // new one anchored at the selection and copy the old one's layout over.
+                // Wrap and the relative-to frame go first, since left/top are measured from it.
+                pic = sel.insertPictureFromBase64(base64, { width: floating.width, height: floating.width * aspect });
+                pic.textWrap.type = floating.textWrap.type;
+                pic.relativeHorizontalPosition = floating.relativeHorizontalPosition;
+                pic.relativeVerticalPosition = floating.relativeVerticalPosition;
+                pic.left = floating.left;
+                pic.top = floating.top;
+                floating.delete();
+              } else {
                 noSelection = true;
                 return;
               }
-              location = Word.InsertLocation.replace;
+            } else {
+              pic = sel.insertInlinePictureFromBase64(base64, Word.InsertLocation.after);
+              pic.width = png.width;
+              pic.height = png.height;
             }
-            
-            const pic = sel.insertInlinePictureFromBase64(base64, location);
             pic.altTextDescription = ALT_TEXT_SENTINEL + JSON.stringify(json);
             await context.sync();
           });
@@ -231,85 +281,81 @@
           );
 
         } else if (hostApp === Office.HostType.PowerPoint) {
-          let noSelection = false;
-          let insertOpts = { coercionType: Office.CoercionType.Image };
-
-          if (mode === 'replace') {
-            await PowerPoint.run(async (context) => {
-              const shapes = context.presentation.getSelectedShapes();
-              shapes.load('items');
-              await context.sync();
-              
-              if (shapes.items.length === 0) {
-                noSelection = true;
-              } else {
-                const oldShape = shapes.items[0];
-                oldShape.load(['top', 'left', 'width', 'height']);
-                await context.sync();
-                
-                // Read the old dimensions. We DO NOT delete the shape here, 
-                // we let setSelectedDataAsync natively overwrite the selection.
-                insertOpts.imageLeft = oldShape.left;
-                insertOpts.imageTop = oldShape.top;
-                insertOpts.imageWidth = oldShape.width;
-                insertOpts.imageHeight = oldShape.height;
-              }
-            });
-          }
-          
-          if (noSelection) {
+          // PowerPoint.run has no insert-picture call, so we go through the common
+          // setSelectedDataAsync API. The inserted picture is NOT reliably selected
+          // afterwards (tagging "the selection" hit the old shape or nothing), so we
+          // find it by diffing the slide's shape ids before and after the insert.
+          let beforeIds;
+          let old = null;
+          await PowerPoint.run(async (context) => {
+            const slideShapes = context.presentation.getSelectedSlides().getItemAt(0).shapes;
+            slideShapes.load('items/id');
+            const selected = context.presentation.getSelectedShapes();
+            selected.load('items/id,items/type,items/left,items/top,items/width');
+            await context.sync();
+            beforeIds = new Set(slideShapes.items.map((s) => s.id));
+            const s = selected.items[0];
+            if (mode === 'replace' && s && s.type === PowerPoint.ShapeType.image) {
+              old = { id: s.id, left: s.left, top: s.top, width: s.width };
+            }
+          });
+          if (mode === 'replace' && old === null) {
             setStatus('nothing selected to replace -- select a diagram first', 'error');
             return;
           }
 
-          await new Promise((resolve) => {
-            Office.context.document.setSelectedDataAsync(base64, insertOpts, async (result) => {
-              if (result.status === Office.AsyncResultStatus.Failed) {
-                setStatus('insert failed: ' + result.error.message, 'error');
-                resolve();
-                return;
-              }
-              
-              // RETRY LOOP: Overcomes the async race condition in PowerPoint
-              // Office takes time to establish the newly inserted object as "selected".
-              let success = false;
-              for (let attempt = 0; attempt < 5; attempt++) {
-                await new Promise(r => setTimeout(r, 200)); 
-                try {
-                  success = await PowerPoint.run(async (context) => {
-                    const shapes = context.presentation.getSelectedShapes();
-                    shapes.load('items');
-                    await context.sync();
-                    
-                    if (shapes.items.length > 0) {
-                      const newShape = shapes.items[0];
-                      const jsonStr = JSON.stringify(json);
-                      const CHUNK_SIZE = 250;
-                      const chunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
-                      
-                      newShape.tags.add('WAVEJSON_CHUNKS', chunks.toString());
-                      for (let i = 0; i < chunks; i++) {
-                        newShape.tags.add('WAVEJSON_' + i, jsonStr.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
-                      }
-                      await context.sync();
-                      return true;
-                    }
-                    return false;
-                  });
-                  if (success) break;
-                } catch (e) {
-                  // Ignore and retry
-                }
-              }
-
-              if (success) {
-                setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
-              } else {
-                setStatus('inserted, but failed to save metadata tags. Loading will not work.', 'warning');
-              }
-              resolve();
+          await new Promise((resolve, reject) => {
+            Office.context.document.setSelectedDataAsync(base64, { coercionType: Office.CoercionType.Image }, (result) => {
+              if (result.status === Office.AsyncResultStatus.Failed) reject(result.error);
+              else resolve();
             });
           });
+
+          await PowerPoint.run(async (context) => {
+            const slideShapes = context.presentation.getSelectedSlides().getItemAt(0).shapes;
+            slideShapes.load('items/id');
+            await context.sync();
+            const added = slideShapes.items.filter((s) => !beforeIds.has(s.id));
+            console.log('ppt insert: new shape ids', added.map((s) => s.id));
+            if (added.length !== 1) {
+              throw new Error('expected exactly 1 new shape on the slide after insert, found ' + added.length);
+            }
+            const pic = added[0];
+            // Pictures have no writable alt-text here, so the source lives in a shape tag
+            // (PowerPoint upper-cases tag keys, hence the all-caps name).
+            const tagValue = ALT_TEXT_SENTINEL + JSON.stringify(json);
+            pic.tags.add('WAVEJSON', tagValue);
+            pic.load('left,top,width,height');
+            await context.sync();
+
+            // Tag value length limits aren't documented, so read it back to catch truncation.
+            const tag = pic.tags.getItem('WAVEJSON');
+            tag.load('value');
+            await context.sync();
+            if (tag.value !== tagValue) {
+              throw new Error('tag readback mismatch: wrote ' + tagValue.length + ' chars, read ' + tag.value.length);
+            }
+
+            // Geometry is set directly rather than via setSelectedDataAsync's imageLeft/
+            // imageTop/... options, which PowerPoint ignored (new picture landed centered).
+            // Replace: old position and width, height from the new aspect ratio.
+            // Insert: intended size (the 2x PNG came in double size), re-centered where
+            // PowerPoint put it.
+            const width = old ? old.width : png.width;
+            const height = width * aspect;
+            pic.left = old ? old.left : pic.left + (pic.width - width) / 2;
+            pic.top = old ? old.top : pic.top + (pic.height - height) / 2;
+            pic.width = width;
+            pic.height = height;
+            // setSelectedDataAsync adds a picture rather than replacing the selected one,
+            // so delete the old diagram ourselves (if PowerPoint already did, it's gone).
+            const oldShape = old && slideShapes.items.find((s) => s.id === old.id);
+            if (oldShape) oldShape.delete();
+            await context.sync();
+          });
+          setStatus(mode === 'replace' ? 'replaced' : 'inserted', 'success');
+        } else {
+          throw new Error('unsupported host: ' + hostApp);
         }
       } catch (e) {
         setStatus('insert failed: ' + describeError(e), 'error');
@@ -357,7 +403,7 @@
         
         function processLoadedData(raw) {
           if (!raw.startsWith(ALT_TEXT_SENTINEL)) {
-            setStatus('selected image has no recognizable waveform source (alt-text missing or not from this tool)', 'error');
+            setStatus('selected image has no recognizable waveform source (not inserted by this tool)', 'error');
             return;
           }
           let json;
@@ -375,17 +421,12 @@
         try {
           if (hostApp === Office.HostType.Word) {
             await Word.run(async (context) => {
-              const sel = context.document.getSelection();
-              const pics = sel.inlinePictures;
-              pics.load('items');
-              await context.sync();
-              
-              if (pics.items.length === 0) {
+              const { inline, floating } = await getSelectedWordPicture(context, context.document.getSelection());
+              const pic = inline || floating;
+              if (!pic) {
                 setStatus('select a diagram image first', 'error');
                 return;
               }
-              
-              const pic = pics.items[0];
               pic.load('altTextDescription');
               await context.sync();
   
@@ -404,37 +445,13 @@
                 return;
               }
               
-              const shape = shapes.items[0];
-              
-              try {
-                shape.tags.load('key, value');
-                await context.sync();
-                
-                // .toUpperCase protects against Office internally modifying case rules 
-                const chunkTag = shape.tags.items.find((t) => t.key.toUpperCase() === 'WAVEJSON_CHUNKS');
-                const waveTag = shape.tags.items.find((t) => t.key.toUpperCase() === 'WAVEJSON');
-                
-                let rawJsonStr = '';
-                if (chunkTag) {
-                  const chunks = parseInt(chunkTag.value, 10);
-                  for (let i = 0; i < chunks; i++) {
-                    const cTag = shape.tags.items.find((t) => t.key.toUpperCase() === 'WAVEJSON_' + i);
-                    if (cTag) rawJsonStr += cTag.value;
-                  }
-                } else if (waveTag) {
-                  rawJsonStr = waveTag.value;
-                }
-                
-                if (rawJsonStr) {
-                  processLoadedData(ALT_TEXT_SENTINEL + rawJsonStr);
-                  return;
-                }
-              } catch (tagErr) {
-                 // Fall back safely if tags aren't loaded or supported
-              }
-              
-              setStatus('selected image has no recognizable waveform metadata', 'error');
+              const tag = shapes.items[0].tags.getItemOrNullObject('WAVEJSON');
+              tag.load('value');
+              await context.sync();
+              processLoadedData(tag.isNullObject ? '' : tag.value);
             });
+          } else {
+            throw new Error('unsupported host: ' + hostApp);
           }
         } catch (e) {
           setStatus('load failed: ' + describeError(e), 'error');
