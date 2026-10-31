@@ -43,7 +43,7 @@ When in doubt: fewer files, fewer layers, fewer knobs.
 
 ## Word caches the taskpane aggressively
 
-Every time `taskpane.html` changes and gets pushed, bump the `?v=N` query
+Every time `taskpane.html` or `taskpane.js` changes and gets pushed, bump the `?v=N` query
 param on `SourceLocation` in `manifest.xml` to the next number. Without a
 new URL, Word keeps serving a stale cached copy of the taskpane even after
 a fresh GitHub Pages deploy, and changes silently don't show up. This one
@@ -52,7 +52,8 @@ project — always bump it, no exceptions.
 
 The taskpane also shows a `build vN` marker at the top of the page (bump it
 alongside `?v=N`) so a stale load is visually obvious instead of silently
-misleading.
+misleading. `taskpane.html` loads `taskpane.js?v=N` — bump that too, or Word
+serves the new page with the old script.
 
 If bumping `?v=N` still doesn't work and the build marker won't update no
 matter what, that's a deeper cache (browser HTTP cache or a Word-session

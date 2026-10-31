@@ -69,14 +69,33 @@ working example.
 
 ## Files
 
-- `taskpane.html` — the whole add-in. Editor, WaveDrom render, Office.js
-  calls, all in one file.
+- `taskpane.html` — the taskpane page: layout, styles and the
+  Content-Security-Policy. Also opens in a plain browser for iterating on
+  rendering without Word (Insert/Load just report an unsupported host).
+- `taskpane.js` — all the logic: editor, WaveDrom render, Office.js calls.
+  It's a separate file only because the CSP forbids inline script.
 - `manifest.xml` — points Word at the hosted taskpane, sideload this file.
-- `prototype.html` — standalone WaveJSON-to-SVG renderer, no Word/Office.js.
-  Useful for iterating on rendering without touching Word at all.
 - `vendor/wavedrom.min.js`, `vendor/default.js` — WaveDrom itself, vendored
-  into the repo instead of pulled from jsDelivr. `office.js` is still loaded
-  from Microsoft's CDN (required — can't be self-hosted).
+  into the repo instead of pulled from jsDelivr.
+- `vendor/office/` — Microsoft's Office.js, vendored so the taskpane only
+  talks to its own host. Fetched from Microsoft's CDN by
+  `vendor/fetch-office-js.sh`. Re-run it every few months and commit the
+  result: Microsoft ships host fixes on the CDN that a frozen copy misses. Self-hosting is fine for an internally deployed add-in;
+  only Microsoft Marketplace (AppSource) listings must use the CDN.
+
+## Security notes
+
+- **Diagram source from other documents is untrusted.** WaveDrom turns some
+  WaveJSON fields into raw SVG markup, so a crafted alt-text could carry
+  script. The taskpane's CSP blocks inline and eval'd script and all
+  outbound requests, and **Load** refuses any source with an `on*` key.
+  Don't loosen the CSP to fix something without checking what it re-enables.
+- **The source is hidden data.** Cropping, covering or blurring a diagram
+  leaves its full WaveJSON in the alt-text (and in `<img alt>` on HTML
+  export). Before releasing a redacted document, delete or regenerate the
+  alt-text of any diagram you changed visually.
+- **The picture and its source can disagree.** Anyone can edit the alt-text
+  by hand. Look at the preview after **Load** before you **Replace**.
 
 ## LLM-readability
 
