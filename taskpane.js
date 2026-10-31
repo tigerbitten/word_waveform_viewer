@@ -32,13 +32,17 @@ async function withButtonsDisabled(fn) {
 
 // WaveDrom turns arrays in name/text fields into raw SVG elements with whatever
 // attributes they list, so a diagram from someone else's document can carry
-// onerror="..." handlers. The CSP in taskpane.html already stops them running;
-// this refuses them with a clear message instead of a silent console line.
-function assertNoEventHandlers(value) {
+// markup. on* handlers: the CSP already blocks them, this just makes it loud.
+// The rest the CSP can't stop, because it doesn't govern navigation: href and
+// attributeName (via <set>) make links, xmlns lets in HTML such as
+// <meta http-equiv="refresh">, which redirects the taskpane on render.
+function assertNoActiveMarkup(value) {
   if (value === null || typeof value !== 'object') return;
   for (const [key, child] of Object.entries(value)) {
-    if (/^on/i.test(key)) throw new Error('"' + key + '" is not allowed in a diagram (event handler)');
-    assertNoEventHandlers(child);
+    if (/^on|href$|^xmlns|^attributename$/i.test(key)) {
+      throw new Error('"' + key + '" is not allowed in a diagram (it could run script or navigate the taskpane)');
+    }
+    assertNoActiveMarkup(child);
   }
 }
 
@@ -56,7 +60,7 @@ function parseWaveJSON(text) {
   if (json === null || typeof json !== 'object' || Array.isArray(json)) {
     throw new Error('top level must be an object, like { signal: [...] }');
   }
-  assertNoEventHandlers(json);
+  assertNoActiveMarkup(json);
   return json;
 }
 
@@ -353,7 +357,7 @@ Office.onReady((info) => {
         // Checked before it reaches the editor, since a document from someone else
         // is exactly where a hostile diagram would come from.
         try {
-          assertNoEventHandlers(json);
+          assertNoActiveMarkup(json);
         } catch (e) {
           setStatus('diagram source is unsafe, refusing to load: ' + e.message, 'error');
           return;

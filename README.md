@@ -87,8 +87,10 @@ working example.
 
 - **Diagram source from other documents is untrusted.** WaveDrom turns some
   WaveJSON fields into raw SVG markup, so a crafted alt-text could carry
-  script. The taskpane's CSP blocks inline and eval'd script and all
-  outbound requests, and **Load** refuses any source with an `on*` key.
+  script or a redirect. The taskpane's CSP blocks inline and eval'd script
+  and all outbound requests. The CSP can't stop navigation, so the editor
+  and **Load** also refuse any source with an `on*`, `*href`, `xmlns*` or
+  `attributeName` key.
   Don't loosen the CSP to fix something without checking what it re-enables.
 - **The source is hidden data.** Cropping, covering or blurring a diagram
   leaves its full WaveJSON in the alt-text (and in `<img alt>` on HTML
