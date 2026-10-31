@@ -14,7 +14,7 @@ who wants to use this add-in on desktop Word repeats it themselves.
 ### Windows
 
 1. Make a local folder, e.g. `C:\AddinCatalog`.
-2. Download `manifest.xml` from this repo into that folder. MAKE SURE TO USE THE GITHUB 'Download Raw File' BUTTON. The manifest file should be ~2KB.
+2. Download `manifest.xml` from this repo into that folder. MAKE SURE TO USE THE GITHUB 'Download Raw File' BUTTON. The manifest file should be ~1KB. If it still downloads as HTML (much bigger, starts with `<!DOCTYPE html>`), open the raw file in your browser and copy-paste its text into an empty `manifest.xml` instead.
 3. In Word: **File → Options → Trust Center → Trust Center Settings →
    Trusted Add-in Catalogs**. As the Catalog Url, use
    `\\localhost\c$\AddinCatalog` (swap in your actual folder path), check
@@ -24,7 +24,7 @@ who wants to use this add-in on desktop Word repeats it themselves.
 
 ### Mac
 
-1. Download `manifest.xml` from this repo. MAKE SURE TO USE THE GITHUB 'Download Raw File' BUTTON. The manifest file should be ~2KB.
+1. Download `manifest.xml` from this repo. MAKE SURE TO USE THE GITHUB 'Download Raw File' BUTTON. The manifest file should be ~1KB. If it still downloads as HTML (much bigger, starts with `<!DOCTYPE html>`), open the raw file in your browser and copy-paste its text into an empty `manifest.xml` instead.
 2. Run `mkdir -p ~/Library/Containers/com.microsoft.Word/Data/Documents/wef`
 3. Move `manifest.xml` into that `wef` folder.
 4. Quit Word completely, then reopen it.
